@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS 27 — Liquid Glass Spatial OS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font (SF Pro alternative) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Inter"', 'sans-serif'],
+                    },
+                    transitionTimingFunction: {
+                        'apple-spring': 'cubic-bezier(0.22, 1, 0.36, 1)',
+                        'apple-bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --glass-blur: 32px;
+            --glass-opacity: 0.14;
+            --glass-border-alpha: 0.38;
+            --glass-saturation: 185%;
+            --mouse-x: 50%;
+            --mouse-y: 50%;
+        }
+
+        html.light-glass {
+            --glass-opacity: 0.42;
+            --glass-border-alpha: 0.65;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+            background-color: #05050a;
+            color: #ffffff;
+            transition: color 0.4s ease;
+        }
+
+        html.light-glass body {
+            color: #111827;
+        }
+
+        /* =========================================================
+           1. LIQUID MESH BACKGROUND & FLOATING ORBS
+           ========================================================= */
+        #wallpaper-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            overflow: hidden;
+            transition: background 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(85px);
+            opacity: 0.78;
+            animation: floatOrb 18s infinite alternate ease-in-out;
+            transition: background 1.2s ease, transform 0.8s ease;
+        }
+
+        .orb-1 {
+            width: 55vw;
+            height: 55vw;
+            top: -15%;
+            left: -10%;
+            animation-duration: 22s;
+        }
+
+        .orb-2 {
+            width: 50vw;
+            height: 50vw;
+            bottom: -15%;
+            right: -10%;
+            animation-duration: 19s;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 42vw;
+            height: 42vw;
+            top: 35%;
+            left: 30%;
+            animation-duration: 25s;
+            animation-delay: -11s;
+        }
+
+        @keyframes floatOrb {
+            0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+            50% { transform: translate(6%, 8%) scale(1.12) rotate(15deg); }
+            100% { transform: translate(-5%, -6%) scale(0.95) rotate(-10deg); }
+        }
+
+        /* Real-time Screen Brightness Overlay */
+        #brightness-overlay {
+            position: fixed;
+            inset: 0;
+            background: #000000;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 90;
+            transition: opacity 0.1s ease;
+        }
+
+        /* =========================================================
+           2. APPLE LIQUID GLASS MATERIAL SYSTEM
+           ========================================================= */
+        .liquid-glass {
+            position: relative;
+            background: linear-gradient(
+                145deg,
+                rgba(255, 255, 255, calc(var(--glass-opacity) + 0.06)) 0%,
+                rgba(255, 255, 255, var(--glass-opacity)) 55%,
+                rgba(255, 255, 255, calc(var(--glass-opacity) * 0.72)) 100%
+            );
+            backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+            border-radius: 30px;
+            /* Specular inner thickness & multi-layered spatial drop shadow */
+            box-shadow: 
+                0 28px 56px -14px rgba(0, 0, 0, 0.42),
+                0 6px 18px -4px rgba(0, 0, 0, 0.22),
+                inset 0 1.5px 1.5px rgba(255, 255, 255, calc(var(--glass-border-alpha) + 0.24)),
+                inset 0 -1.5px 2.5px rgba(0, 0, 0, 0.2);
+            transform-style: preserve-3d;
+            will-change: transform, box-shadow;
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), 
+                        background 0.35s ease, 
+                        box-shadow 0.4s ease;
+            overflow: hidden;
+        }
+
+        html.light-glass .liquid-glass {
+            background: linear-gradient(
+                145deg,
+                rgba(255, 255, 255, calc(var(--glass-opacity) + 0.14)) 0%,
+                rgba(255, 255, 255, var(--glass-opacity)) 100%
+            );
+            box-shadow: 
+                0 24px 48px -12px rgba(15, 23, 42, 0.18),
+                0 4px 12px -2px rgba(15, 23, 42, 0.08),
+                inset 0 1.5px 2px rgba(255, 255, 255, 0.9),
+                inset 0 -1px 2px rgba(15, 23, 42, 0.08);
+        }
+
+        /* Specular Edge Refraction Border (Gradient Ring) */
+        .liquid-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1.35px;
+            background: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, calc(var(--glass-border-alpha) + 0.42)) 0%,
+                rgba(255, 255, 255, 0.12) 38%,
+                rgba(255, 255, 255, 0.03) 65%,
+                rgba(255, 255, 255, calc(var(--glass-border-alpha) * 0.85)) 100%
+            );
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Interactive Cursor Specular Glare Overlay */
+        .liquid-glass::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: radial-gradient(
+                440px circle at var(--card-mouse-x, 50%) var(--card-mouse-y, 50%),
+                rgba(255, 255, 255, 0.26),
+                transparent 60%
+            );
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .liquid-glass:hover::after {
+            opacity: 1;
+        }
+
+        .liquid-glass:hover {
+            box-shadow: 
+                0 34px 64px -14px rgba(0, 0, 0, 0.5),
+                0 8px 20px -4px rgba(0, 0, 0, 0.25),
+                inset 0 1.5px 2px rgba(255, 255, 255, calc(var(--glass-border-alpha) + 0.3)),
+                inset 0 -1.5px 2.5px rgba(0, 0, 0, 0.22);
+        }
+
+        /* =========================================================
+           3. DYNAMIC ISLAND & AUDIO WAVEFORM
+           ========================================================= */
+        #dynamic-island {
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+            transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .wave-bar {
+            width: 3px;
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(to top, #38bdf8, #a855f7);
+            animation: wavePulse 1.1s ease-in-out infinite alternate;
+            transform-origin: bottom;
+        }
+
+        .wave-paused .wave-bar {
+            animation-play-state: paused;
+            transform: scaleY(0.25);
+        }
+
+        @keyframes wavePulse {
+            0% { transform: scaleY(0.25); }
+            100% { transform: scaleY(1); }
+        }
+
+        /* =========================================================
+           4. VERTICAL LIQUID SLIDERS (BRIGHTNESS & VOLUME)
+           ========================================================= */
+        .liquid-slider-track {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            cursor: ns-resize;
+            touch-action: none;
+        }
+
+        .liquid-slider-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.98));
+            border-radius: 0 0 22px 22px;
+            transition: height 0.08s ease-out;
+            pointer-events: none;
+        }
+
+        .glass-well {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        /* =========================================================
+           5. AUTO-EXPANDING FLOATING SPATIAL DOCK
+           ========================================================= */
+        #spatial-dock {
+            display: inline-flex;
+            align-items: center;
+            overflow: visible !important;
+            transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .dock-slot {
+            position: relative;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+                        height 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .dock-item {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
+        }
+
+        .dock-item:active {
+            transform: scale(0.9);
+        }
+
+        .dock-tooltip {
+            position: absolute;
+            bottom: calc(100% + 12px);
+            left: 50%;
+            transform: translateX(-50%) translateY(6px);
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+            z-index: 60;
+        }
+
+        .dock-slot:hover .dock-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @keyframes dockPopIn {
+            0% { opacity: 0; transform: scale(0.4); width: 0px; }
+            100% { opacity: 1; transform: scale(1); width: 48px; }
+        }
+
+        .dock-slot-enter {
+            animation: dockPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        /* =========================================================
+           6. INITIAL GHz LIQUID GLASS SPLASH & SCROLL TRANSITION
+           ========================================================= */
+        .ghz-glass-text {
+            background: linear-gradient(
+                120deg,
+                rgba(255, 255, 255, 0.98) 0%,
+                rgba(255, 255, 255, 0.65) 28%,
+                rgba(255, 255, 255, 1) 48%,
+                rgba(255, 255, 255, 0.58) 72%,
+                rgba(255, 255, 255, 0.92) 100%
+            );
+            background-size: 220% auto;
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.38));
+            animation: liquidShimmer 6s ease-in-out infinite alternate;
+        }
+
+        @keyframes liquidShimmer {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        @keyframes emblemBreathing {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-6px) scale(1.012); }
+        }
+
+        .ghz-emblem-float {
+            animation: emblemBreathing 6.5s ease-in-out infinite;
+        }
+
+        /* Staggered Bento Reveal Animation */
+        .bento-reveal {
+            opacity: 0;
+            transform: translateY(28px) scale(0.97);
+            transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .bento-reveal.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Liquid Button Press Ripple */
+        @keyframes liquidRipple {
+            0% { transform: scale(0); opacity: 0.45; }
+            100% { transform: scale(2.8); opacity: 0; }
+        }
+
+        .ripple-wave {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 70%);
+            pointer-events: none;
+            animation: liquidRipple 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            z-index: 5;
+        }
+
+        @keyframes floatScrollPill {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(6px); }
+        }
+
+        .scroll-cue-anim {
+            animation: floatScrollPill 2.2s ease-in-out infinite;
+        }
+
+        /* Custom range inputs inside Glass Customizer */
+        input[type="range"].apple-range {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"].apple-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #ffffff;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"].apple-range::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+    </style>
+</head>
+<body class="antialiased selection:bg-white/30">
+
+    <!-- Real-time Screen Brightness Overlay -->
+    <div id="brightness-overlay"></div>
+
+    <!-- Animated Liquid Mesh Background -->
+    <div id="wallpaper-canvas">
+        <div id="orb-1" class="orb orb-1"></div>
+        <div id="orb-2" class="orb orb-2"></div>
+        <div id="orb-3" class="orb orb-3"></div>
+    </div>
+
+    <!-- =========================================================
+         INITIAL FULL-SCREEN SPLASH: "GHz" LIQUID GLASS HERO
+         ========================================================= -->
+    <section id="ghz-hero-screen" class="relative min-h-screen w-full flex flex-col items-center justify-center px-6 text-center z-20 transition-all duration-700">
+        <!-- Ambient Chromatic Halo Behind GHz Card -->
+        <div class="relative max-w-xl w-full flex items-center justify-center ghz-emblem-float">
+            <div class="absolute -inset-4 rounded-[52px] bg-gradient-to-tr from-sky-400/25 via-fuchsia-400/20 to-emerald-400/25 blur-2xl pointer-events-none"></div>
+
+            <!-- Ambient Glass Emblem Behind GHz -->
+            <div class="liquid-glass tilt-card px-10 py-9 sm:px-16 sm:py-12 !rounded-[44px] flex flex-col items-center justify-center w-full">
+                <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/15 border border-white/25 text-[11px] font-semibold tracking-widest uppercase mb-3 shadow-inner">
+                    <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                    Spatial Core Architecture
+                </div>
+
+                <h1 class="ghz-glass-text text-7xl sm:text-8xl md:text-9xl font-bold tracking-tighter leading-none select-none py-1">
+                    GHz
+                </h1>
+
+                <p class="mt-4 text-xs sm:text-sm opacity-80 max-w-xs sm:max-w-sm leading-relaxed font-medium">
+                    iOS 27 Liquid Glass Experience — Pembiasan cahaya adaptif dan antarmuka spasial generasi berikutnya.
+                </p>
+            </div>
+        </div>
+
+        <!-- Scroll Down Cue Button -->
+        <button onclick="scrollToMainOS()" class="scroll-cue-anim mt-12 inline-flex flex-col items-center gap-2.5 group cursor-pointer focus:outline-none">
+            <span class="px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-xs font-semibold tracking-wide transition">
+                Scroll ke bawah untuk melihat UI utama
+            </span>
+            <div class="w-7 h-11 rounded-full border border-white/35 bg-white/10 backdrop-blur-md flex items-start justify-center p-1.5">
+                <span class="w-1.5 h-2.5 rounded-full bg-white animate-bounce"></span>
+            </div>
+        </button>
+    </section>
+
+    <!-- =========================================================
+         MAIN OS WORKSPACE (REVEALED ON SCROLL)
+         ========================================================= -->
+    <div id="main-os-wrapper" class="relative min-h-screen">
+
+    <!-- =========================================================
+         TOP STATUS BAR & EXPANDABLE DYNAMIC ISLAND
+         ========================================================= -->
+    <header class="sticky top-0 z-30 w-full px-5 sm:px-8 pt-3.5 pb-2 flex items-center justify-between text-xs font-semibold tracking-tight">
+        <!-- Left: Live Time & Location -->
+        <div class="flex items-center gap-2.5">
+            <span id="status-time" class="text-sm font-bold tracking-normal">22:45</span>
+            <span class="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-medium">
+                <svg class="w-3 h-3 text-sky-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg>
+                Spatial OS 27
+            </span>
+        </div>
+
+        <!-- Center: Interactive Dynamic Island -->
+        <div id="dynamic-island" onclick="toggleDynamicIsland()" style="width: 230px; height: 38px; border-radius: 28px;" class="cursor-pointer flex items-center justify-between px-3.5 overflow-hidden select-none">
+            <!-- Collapsed State -->
+            <div id="di-collapsed" class="w-full flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-400 via-blue-500 to-purple-500 shrink-0 shadow-inner"></div>
+                    <span id="di-mini-title" class="text-[11px] font-medium truncate text-white/90">Spatial Horizon</span>
+                </div>
+                <div id="di-wave" class="flex items-end gap-[2.5px] h-4 shrink-0">
+                    <span class="wave-bar" style="animation-delay: 0s;"></span>
+                    <span class="wave-bar" style="animation-delay: 0.2s;"></span>
+                    <span class="wave-bar" style="animation-delay: 0.4s;"></span>
+                    <span class="wave-bar" style="animation-delay: 0.15s;"></span>
+                </div>
+            </div>
+
+            <!-- Expanded State -->
+            <div id="di-expanded" class="hidden w-full flex-col justify-between py-2.5 gap-2.5" onclick="event.stopPropagation()">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
+                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <div id="di-exp-title" class="text-sm font-bold text-white truncate">Spatial Horizon</div>
+                            <div id="di-exp-artist" class="text-xs text-white/65 truncate">Apple Design Lab</div>
+                        </div>
+                    </div>
+                    <div id="di-exp-wave" class="flex items-end gap-[3px] h-5 shrink-0">
+                        <span class="wave-bar" style="animation-delay: 0.1s;"></span>
+                        <span class="wave-bar" style="animation-delay: 0.3s;"></span>
+                        <span class="wave-bar" style="animation-delay: 0.05s;"></span>
+                        <span class="wave-bar" style="animation-delay: 0.25s;"></span>
+                        <span class="wave-bar" style="animation-delay: 0.45s;"></span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-1 border-t border-white/10">
+                    <button onclick="prevTrack()" class="p-1.5 rounded-full hover:bg-white/15 text-white/85 transition">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                    </button>
+                    <button onclick="togglePlay()" class="w-8 h-8 rounded-full bg-white text-slate-950 flex items-center justify-center shadow hover:scale-105 transition">
+                        <svg id="di-play-icon" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    <button onclick="nextTrack()" class="p-1.5 rounded-full hover:bg-white/15 text-white/85 transition">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
+                    <button onclick="toggleDynamicIsland()" class="px-2.5 py-1 rounded-full bg-white/15 text-[10px] font-semibold text-white/90 hover:bg-white/25 transition">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Theme Toggle, Glass Lab & Battery -->
+        <div class="flex items-center gap-2">
+            <button onclick="toggleGlassTheme()" title="Ubah Mode Kaca Terang / Gelap" class="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 transition">
+                <svg id="theme-icon-moon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                <svg id="theme-icon-sun" class="w-3.5 h-3.5 hidden text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path stroke-linecap="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            </button>
+            <button onclick="openGlassModal()" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-[11px] font-semibold transition">
+                <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                Glass Lab
+            </button>
+            <div class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px]">
+                <span>98%</span>
+                <div class="w-5 h-2.5 rounded-[4px] border border-white/60 p-[1.5px] flex items-center">
+                    <div class="h-full w-full bg-emerald-400 rounded-[2px]"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- =========================================================
+         MAIN SPATIAL DASHBOARD & CONTROL CENTER GRID
+         ========================================================= -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 pt-3 pb-32 space-y-5">
+
+        <!-- Hero Clock & Atmosphere Bar -->
+        <section class="liquid-glass tilt-card bento-reveal p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-5" style="transition-delay: 40ms;">
+            <div>
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-[11px] font-semibold tracking-wide uppercase mb-2">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    iOS 27 • Liquid Glass Engine
+                </div>
+                <h1 id="widget-clock" class="text-4xl sm:text-5xl font-bold tracking-tight tabular-nums">22:45:00</h1>
+                <p id="live-date-full" class="text-xs sm:text-sm opacity-75 mt-1">Jumat, 13 November 2026</p>
+            </div>
+
+            <!-- Atmosphere Swatches -->
+            <div class="flex flex-col sm:items-end gap-2.5">
+                <span class="text-[11px] font-semibold uppercase tracking-wider opacity-70">Atmosfer Latar Kaca</span>
+                <div class="flex items-center gap-2.5">
+                    <button onclick="setWallpaper('aurora')" data-wp="aurora" class="wp-btn w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-indigo-500 border border-white/50 shadow-lg transition-all" title="Aurora Borealis"></button>
+                    <button onclick="setWallpaper('sunset')" data-wp="sunset" class="wp-btn w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 border border-white/50 shadow-lg transition-all" title="Cupertino Sunset"></button>
+                    <button onclick="setWallpaper('ocean')" data-wp="ocean" class="wp-btn w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-blue-700 border border-white/50 shadow-lg transition-all" title="Deep Pacific"></button>
+                    <button onclick="setWallpaper('silver')" data-wp="silver" class="wp-btn w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-indigo-200 border border-white/80 shadow-lg transition-all" title="visionOS Light Glass"></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bento Control Center Grid -->
+        <section class="grid grid-cols-1 md:grid-cols-12 gap-5">
+
+            <!-- Connectivity Matrix (5 cols) -->
+            <div class="md:col-span-5 liquid-glass tilt-card bento-reveal p-5 flex flex-col justify-between gap-4" style="transition-delay: 110ms;">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-75">Konektivitas</span>
+                    <span id="conn-status-badge" class="px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-semibold">4 Aktif</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Wi-Fi -->
+                    <button onclick="toggleControl(this, 'wifi')" data-active="true" class="ctrl-btn p-3.5 rounded-2xl bg-sky-500 shadow-lg shadow-sky-500/30 text-white text-left flex flex-col justify-between gap-3 transition-all active:scale-95">
+                        <div class="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold">Wi-Fi</div>
+                            <div class="ctrl-sub text-[10px] opacity-85 truncate">Apple_Spatial_6E</div>
+                        </div>
+                    </button>
+
+                    <!-- Bluetooth -->
+                    <button onclick="toggleControl(this, 'bt')" data-active="true" class="ctrl-btn p-3.5 rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/30 text-white text-left flex flex-col justify-between gap-3 transition-all active:scale-95">
+                        <div class="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold">Bluetooth</div>
+                            <div class="ctrl-sub text-[10px] opacity-85 truncate">AirPods Pro</div>
+                        </div>
+                    </button>
+
+                    <!-- AirDrop -->
+                    <button onclick="toggleControl(this, 'airdrop'); triggerAirDropToast()" data-active="true" class="ctrl-btn p-3.5 rounded-2xl bg-indigo-500 shadow-lg shadow-indigo-500/30 text-white text-left flex flex-col justify-between gap-3 transition-all active:scale-95">
+                        <div class="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path stroke-linecap="round" d="M16.24 7.76a6 6 0 010 8.49m-8.48-.01a6 6 0 010-8.49m11.31-2.82a10 10 0 010 14.14m-14.14 0a10 10 0 010-14.14"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold">AirDrop</div>
+                            <div class="ctrl-sub text-[10px] opacity-85 truncate">Semua Orang</div>
+                        </div>
+                    </button>
+
+                    <!-- Seluler 5G -->
+                    <button onclick="toggleControl(this, 'cellular')" data-active="true" class="ctrl-btn p-3.5 rounded-2xl bg-emerald-500 shadow-lg shadow-emerald-500/30 text-white text-left flex flex-col justify-between gap-3 transition-all active:scale-95">
+                        <div class="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold">Data 5G+</div>
+                            <div class="ctrl-sub text-[10px] opacity-85 truncate">Tersambung</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Spatial Media Player (4 cols) -->
+            <div class="md:col-span-4 liquid-glass tilt-card bento-reveal p-5 flex flex-col justify-between gap-4" style="transition-delay: 180ms;">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-75">Spatial Audio</span>
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold">Lossless</span>
+                </div>
+
+                <div class="flex items-center gap-3.5">
+                    <div id="player-cover" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 shadow-xl flex items-center justify-center shrink-0 transition-all duration-500">
+                        <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 id="track-title" class="text-base font-bold truncate">Spatial Horizon</h3>
+                        <p id="track-artist" class="text-xs opacity-70 truncate">Apple Design Lab</p>
+                    </div>
+                </div>
+
+                <!-- Interactive Scrubber -->
+                <div class="space-y-1.5">
+                    <div onclick="seekTrack(event)" class="w-full h-2 rounded-full bg-white/15 overflow-hidden cursor-pointer">
+                        <div id="progress-bar" class="h-full bg-white rounded-full transition-all duration-300" style="width: 38%;"></div>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-medium opacity-65 tabular-nums">
+                        <span id="time-current">1:24</span>
+                        <span id="time-total">3:42</span>
+                    </div>
+                </div>
+
+                <!-- Playback Controls -->
+                <div class="flex items-center justify-center gap-5 pt-1">
+                    <button onclick="prevTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                    </button>
+                    <button onclick="togglePlay()" class="w-12 h-12 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-lg hover:scale-105 transition active:scale-95">
+                        <svg id="main-play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    <button onclick="nextTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vertical Sliders: Brightness & Volume (3 cols) -->
+            <div class="md:col-span-3 liquid-glass tilt-card bento-reveal p-5 flex flex-col justify-between gap-3" style="transition-delay: 250ms;">
+                <span class="text-xs font-bold uppercase tracking-wider opacity-75">Tampilan & Suara</span>
+                <div class="grid grid-cols-2 gap-3.5 h-44">
+                    <!-- Brightness -->
+                    <div id="brightness-slider" class="liquid-slider-track flex flex-col items-center justify-end pb-3.5">
+                        <div id="brightness-fill" class="liquid-slider-fill" style="height: 100%;"></div>
+                        <div class="relative z-10 flex flex-col items-center gap-1 mix-blend-difference text-white pointer-events-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41"/></svg>
+                            <span id="brightness-val" class="text-[11px] font-bold">100%</span>
+                        </div>
+                    </div>
+
+                    <!-- Volume -->
+                    <div id="volume-slider" class="liquid-slider-track flex flex-col items-center justify-end pb-3.5">
+                        <div id="volume-fill" class="liquid-slider-fill" style="height: 75%;"></div>
+                        <div class="relative z-10 flex flex-col items-center gap-1 mix-blend-difference text-white pointer-events-none">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                            <span id="volume-val" class="text-[11px] font-bold">75%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Focus Pill & Smart Home Controls (12 cols row) -->
+            <div class="md:col-span-6 liquid-glass tilt-card bento-reveal p-5 flex items-center justify-between gap-4" style="transition-delay: 310ms;">
+                <button id="focus-btn" onclick="toggleFocusMode()" class="glass-well flex-1 p-3.5 rounded-2xl flex items-center gap-3 text-left transition">
+                    <div id="focus-icon-wrap" class="w-9 h-9 rounded-full bg-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                    </div>
+                    <div id="focus-label" class="text-xs font-bold leading-tight">
+                        Fokus<br><span class="opacity-65 font-normal">Mati</span>
+                    </div>
+                </button>
+
+                <button id="ambient-light-btn" onclick="toggleAmbientLight()" class="px-3.5 py-1.5 rounded-full bg-amber-400 text-slate-950 text-xs font-bold shadow-lg shadow-amber-400/30 transition active:scale-95">
+                    Lampu: ON
+                </button>
+            </div>
+
+            <!-- Spatial Home Climate Thermostat (6 cols) -->
+            <div class="md:col-span-6 liquid-glass tilt-card bento-reveal p-5 flex items-center justify-between gap-4" style="transition-delay: 370ms;">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider opacity-70">Suhu Ruangan Studio</span>
+                    <div id="thermostat-temp" class="text-2xl font-bold mt-0.5 tabular-nums">21.5°C</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="adjustTemp(-0.5)" class="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-lg font-bold transition active:scale-90">−</button>
+                    <button onclick="adjustTemp(0.5)" class="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-lg font-bold transition active:scale-90">+</button>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    </div> <!-- End #main-os-wrapper -->
+
+    <!-- =========================================================
+         FLOATING SPATIAL GLASS DOCK (BOTTOM — AUTO-EXPANDING)
+         ========================================================= -->
+    <nav id="bottom-dock-nav" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex justify-center w-auto opacity-0 translate-y-8 pointer-events-none transition-all duration-500">
+        <div id="spatial-dock" class="liquid-glass !rounded-[32px] px-3.5 py-2.5 gap-2.5 sm:gap-3 shadow-2xl">
+            
+            <!-- Pinned Core Apps Container -->
+            <div id="dock-apps-list" class="flex items-center gap-2.5 sm:gap-3">
+                <!-- App 1: Glass Lab / Settings -->
+                <div class="dock-slot" data-app="settings">
+                    <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Glass Lab</span>
+                    <button onclick="openGlassModal(); setDockActive('settings')" class="dock-item rounded-2xl bg-gradient-to-b from-slate-600 to-slate-800 border border-white/35 shadow-lg">
+                        <svg class="w-[54%] h-[54%] text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white absolute -bottom-1.5 transition-opacity"></span>
+                </div>
+
+                <!-- App 2: Spatial Safari -->
+                <div class="dock-slot" data-app="safari">
+                    <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Safari Spatial</span>
+                    <button onclick="openAppWindow('safari'); setDockActive('safari')" class="dock-item rounded-2xl bg-gradient-to-b from-sky-400 to-blue-600 border border-white/35 shadow-lg">
+                        <svg class="w-[54%] h-[54%] text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                    </button>
+                    <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white opacity-0 absolute -bottom-1.5 transition-opacity"></span>
+                </div>
+
+                <!-- App 3: Spatial Photos -->
+                <div class="dock-slot" data-app="photos">
+                    <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Ganti Atmosfer</span>
+                    <button onclick="cycleWallpaper(); setDockActive('photos')" class="dock-item rounded-2xl bg-white border border-white/50 shadow-lg">
+                        <svg class="w-[54%] h-[54%] text-rose-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </button>
+                    <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white opacity-0 absolute -bottom-1.5 transition-opacity"></span>
+                </div>
+            </div>
+
+            <!-- Dynamic Divider -->
+            <div class="w-[1px] h-7 bg-white/25 mx-0.5 shrink-0"></div>
+
+            <!-- Right Utilities: Expand Island + Add/Remove Extra App -->
+            <div class="flex items-center gap-2.5 sm:gap-3">
+                <div class="dock-slot" data-app="island">
+                    <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Dynamic Island</span>
+                    <button onclick="toggleDynamicIsland(); setDockActive('island')" class="dock-item rounded-2xl bg-gradient-to-tr from-fuchsia-600 to-indigo-600 border border-white/35 shadow-lg">
+                        <svg class="w-[52%] h-[52%] text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                    </button>
+                </div>
+
+                <!-- Toggle Extra Spatial Apps in Dock (Makes Dock Grow/Shrink) -->
+                <div class="dock-slot" data-app="drawer">
+                    <span id="drawer-tooltip" class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Tambah Apl ke Bar</span>
+                    <button onclick="toggleExtraDockApps()" id="dock-plus-btn" class="dock-item rounded-2xl bg-white/15 hover:bg-white/25 border border-white/30 shadow-lg">
+                        <svg id="dock-plus-icon" class="w-[50%] h-[50%] text-white transition-transform duration-300" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- =========================================================
+         MINI SPATIAL APP WINDOW (SAFARI / NOTES / CAMERA)
+         ========================================================= -->
+    <div id="spatial-app-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div class="liquid-glass w-full max-w-lg p-6 animate-[fadeIn_0.25s_ease-out]">
+            <div class="flex items-center justify-between pb-4 border-b border-white/15">
+                <div class="flex items-center gap-2.5">
+                    <div id="app-modal-badge" class="w-8 h-8 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                    </div>
+                    <div>
+                        <h3 id="app-modal-title" class="text-base font-bold">Safari Spatial Browser</h3>
+                        <p id="app-modal-sub" class="text-[11px] opacity-70">iOS 27 Floating Glass Window</p>
+                    </div>
+                </div>
+                <button onclick="closeAppWindow()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="app-modal-body" class="py-5 text-sm leading-relaxed opacity-90">
+                <!-- Dynamic App Content -->
+            </div>
+            <div class="flex justify-end">
+                <button onclick="closeAppWindow()" class="px-5 py-2 rounded-full bg-white text-slate-900 text-xs font-bold shadow hover:scale-105 transition">
+                    Tutup Jendela
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         GLASS CUSTOMIZER MODAL (REAL-TIME SHADER/CSS TUNER)
+         ========================================================= -->
+    <div id="glass-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
+        <div class="liquid-glass w-full max-w-md p-6 sm:p-7 animate-[fadeIn_0.25s_ease-out]">
+            <div class="flex items-center justify-between mb-5">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-sky-300">iOS 27 Material Engine</span>
+                    <h2 class="text-xl font-bold">Liquid Glass Customizer</h2>
+                </div>
+                <button onclick="closeGlassModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Blur Intensity -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-2">
+                        <span>Intensitas Blur (Backdrop Blur)</span>
+                        <span id="lbl-blur" class="text-sky-300">32px</span>
+                    </div>
+                    <input type="range" min="4" max="64" value="32" class="apple-range" oninput="updateGlassVar('--glass-blur', this.value + 'px', 'lbl-blur', this.value + 'px')">
+                </div>
+
+                <!-- Glass Opacity -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-2">
+                        <span>Transparansi Kaca (Opacity)</span>
+                        <span id="lbl-opacity" class="text-sky-300">14%</span>
+                    </div>
+                    <input type="range" min="4" max="55" value="14" class="apple-range" oninput="updateGlassVar('--glass-opacity', (this.value / 100), 'lbl-opacity', this.value + '%')">
+                </div>
+
+                <!-- Specular Edge Glow -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-2">
+                        <span>Kilau Refleksi Tepi (Specular Edge)</span>
+                        <span id="lbl-border" class="text-sky-300">38%</span>
+                    </div>
+                    <input type="range" min="10" max="85" value="38" class="apple-range" oninput="updateGlassVar('--glass-border-alpha', (this.value / 100), 'lbl-border', this.value + '%')">
+                </div>
+
+                <!-- Color Saturation -->
+                <div>
+                    <div class="flex justify-between text-xs font-semibold mb-2">
+                        <span>Saturasi Pembiasan (Saturate)</span>
+                        <span id="lbl-sat" class="text-sky-300">185%</span>
+                    </div>
+                    <input type="range" min="100" max="260" value="185" class="apple-range" oninput="updateGlassVar('--glass-saturation', this.value + '%', 'lbl-sat', this.value + '%')">
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-white/15 flex items-center justify-between gap-3">
+                <button onclick="resetGlassDefaults()" class="px-4 py-2 rounded-full bg-white/15 hover:bg-white/25 text-xs font-semibold transition">
+                    Reset Default
+                </button>
+                <button onclick="closeGlassModal()" class="px-5 py-2 rounded-full bg-white text-slate-900 text-xs font-bold shadow-lg hover:scale-105 transition">
+                    Selesai
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         FLOATING SYSTEM TOAST NOTIFICATION
+         ========================================================= -->
+    <div id="system-toast" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 -translate-y-4 transition-all duration-300">
+        <div class="liquid-glass !rounded-full px-5 py-2.5 flex items-center gap-2.5 shadow-2xl">
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+            <span id="toast-text" class="text-xs font-semibold whitespace-nowrap">Notifikasi Sistem</span>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         JAVASCRIPT ENGINE: INTERACTIVITY, PHYSICS & REALTIME CLOCK
+         ========================================================= -->
+    <script>
+        /* -----------------------------------------------------------
+           1. MOUSE-TRACKING SPECULAR GLARE, 3D TILT & LIQUID RIPPLE
+           ----------------------------------------------------------- */
+        document.querySelectorAll('.liquid-glass').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--card-mouse-x', `${x}px`);
+                card.style.setProperty('--card-mouse-y', `${y}px`);
+
+                // Subtle Apple visionOS 3D spatial tilt on cards
+                if (card.classList.contains('tilt-card')) {
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = ((y - centerY) / centerY) * -2.6;
+                    const rotateY = ((x - centerX) / centerX) * 2.6;
+                    card.style.transform = `perspective(1100px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-2px)`;
+                }
+            });
+
+            card.addEventListener('mouseleave', () => {
+                if (card.classList.contains('tilt-card')) {
+                    card.style.transform = '';
+                }
+            });
+        });
+
+        // Liquid Ripple feedback on interactive buttons
+        document.addEventListener('pointerdown', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const rect = btn.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple-wave';
+            ripple.style.width = ripple.style.height = `${size}px`;
+            ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+            ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+
+            const prevPos = getComputedStyle(btn).position;
+            if (prevPos === 'static') btn.style.position = 'relative';
+            btn.style.overflow = 'hidden';
+            btn.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 660);
+        });
+
+        // Staggered spring entrance observer for Bento widgets
+        const bentoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('is-visible');
+                }
+            });
+        }, { threshold: 0.12 });
+
+        document.querySelectorAll('.bento-reveal').forEach(el => bentoObserver.observe(el));
+
+        /* -----------------------------------------------------------
+           2. WALLPAPER / SPATIAL ATMOSPHERE SWITCHER
+           ----------------------------------------------------------- */
+        const wallpapers = {
+            aurora: {
+                bg: 'radial-gradient(circle at 20% 20%, #062c30 0%, #070b19 60%, #03040a 100%)',
+                orb1: '#10b981',
+                orb2: '#3b82f6',
+                orb3: '#8b5cf6'
+            },
+            sunset: {
+                bg: 'radial-gradient(circle at 80% 10%, #4c1d95 0%, #1e1b4b 55%, #090514 100%)',
+                orb1: '#f59e0b',
+                orb2: '#ec4899',
+                orb3: '#7c3aed'
+            },
+            ocean: {
+                bg: 'radial-gradient(circle at 50% 0%, #0c4a6e 0%, #082f49 55%, #020617 100%)',
+                orb1: '#0284c7',
+                orb2: '#2dd4bf',
+                orb3: '#1d4ed8'
+            },
+            silver: {
+                bg: 'radial-gradient(circle at 30% 30%, #cbd5e1 0%, #94a3b8 55%, #475569 100%)',
+                orb1: '#f8fafc',
+                orb2: '#c7d2fe',
+                orb3: '#fbcfe8'
+            }
+        };
+
+        let currentWpKey = 'aurora';
+        const wpKeys = Object.keys(wallpapers);
+
+        function setWallpaper(key) {
+            currentWpKey = key;
+            const wp = wallpapers[key];
+            const canvas = document.getElementById('wallpaper-canvas');
+            if (canvas) canvas.style.background = wp.bg;
+            const o1 = document.getElementById('orb-1');
+            const o2 = document.getElementById('orb-2');
+            const o3 = document.getElementById('orb-3');
+            if (o1) o1.style.background = wp.orb1;
+            if (o2) o2.style.background = wp.orb2;
+            if (o3) o3.style.background = wp.orb3;
+
+            // Update active ring indicator
+            document.querySelectorAll('.wp-btn').forEach(btn => {
+                if (btn.dataset.wp === key) {
+                    btn.classList.add('ring-2', 'ring-white', 'scale-110');
+                    btn.classList.remove('opacity-75');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-white', 'scale-110');
+                    btn.classList.add('opacity-75');
+                }
+            });
+
+            // Auto-switch to Light Glass if Spatial Silver is chosen
+            if (key === 'silver' && !document.documentElement.classList.contains('light-glass')) {
+                toggleGlassTheme(true);
+            } else if (key !== 'silver' && document.documentElement.classList.contains('light-glass')) {
+                toggleGlassTheme(false);
+            }
+        }
+
+        function cycleWallpaper() {
+            const nextIdx = (wpKeys.indexOf(currentWpKey) + 1) % wpKeys.length;
+            setWallpaper(wpKeys[nextIdx]);
+            showToast(`Atmosfer: ${wpKeys[nextIdx].toUpperCase()}`);
+        }
+
+        // Initialize default wallpaper
+        setWallpaper('aurora');
+
+        /* -----------------------------------------------------------
+           3. DARK / LIGHT GLASS MODE TOGGLE
+           ----------------------------------------------------------- */
+        function toggleGlassTheme(forceLight) {
+            const html = document.documentElement;
+            const isLight = typeof forceLight === 'boolean' ? forceLight : !html.classList.contains('light-glass');
+            
+            if (isLight) {
+                html.classList.add('light-glass');
+                document.getElementById('theme-icon-sun').classList.remove('hidden');
+                document.getElementById('theme-icon-moon').classList.add('hidden');
+            } else {
+                html.classList.remove('light-glass');
+                document.getElementById('theme-icon-sun').classList.add('hidden');
+                document.getElementById('theme-icon-moon').classList.remove('hidden');
+            }
+        }
+
+        /* -----------------------------------------------------------
+           4. DYNAMIC ISLAND EXPAND / COLLAPSE
+           ----------------------------------------------------------- */
+        let diExpanded = false;
+        function toggleDynamicIsland() {
+            const di = document.getElementById('dynamic-island');
+            const collapsed = document.getElementById('di-collapsed');
+            const expanded = document.getElementById('di-expanded');
+            diExpanded = !diExpanded;
+
+            if (diExpanded) {
+                di.style.width = '340px';
+                di.style.height = '132px';
+                di.style.borderRadius = '34px';
+                collapsed.classList.add('hidden');
+                expanded.classList.remove('hidden');
+                expanded.classList.add('flex');
+            } else {
+                di.style.width = '230px';
+                di.style.height = '38px';
+                di.style.borderRadius = '28px';
+                expanded.classList.add('hidden');
+                expanded.classList.remove('flex');
+                collapsed.classList.remove('hidden');
+            }
+        }
+
+        function triggerAirDropToast() {
+            showToast('AirDrop siap menerima file dari perangkat sekitar');
+        }
+
+        /* -----------------------------------------------------------
+           5. INTERACTIVE MUSIC PLAYER & WAVEFORM SYNC
+           ----------------------------------------------------------- */
+        const playlist = [
+            {
+                title: 'Spatial Horizon',
+                artist: 'Apple Design Lab',
+                duration: 222,
+                gradient: 'from-cyan-400 via-blue-600 to-purple-600'
+            },
+            {
+                title: 'Liquid Refraction',
+                artist: 'Cupertino Symphony',
+                duration: 198,
+                gradient: 'from-amber-400 via-rose-500 to-indigo-600'
+            },
+            {
+                title: 'Midnight Glass',
+                artist: 'visionOS Soundscapes',
+                duration: 245,
+                gradient: 'from-emerald-400 via-teal-500 to-cyan-700'
+            }
+        ];
+
+        let trackIndex = 0;
+        let isPlaying = true;
+        let trackElapsed = 84; // seconds
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function renderTrack() {
+            const track = playlist[trackIndex];
+            document.getElementById('track-title').textContent = track.title;
+            document.getElementById('track-artist').textContent = track.artist;
+            document.getElementById('di-mini-title').textContent = track.title;
+            document.getElementById('di-exp-title').textContent = track.title;
+            document.getElementById('di-exp-artist').textContent = track.artist;
+            document.getElementById('time-total').textContent = formatTime(track.duration);
+
+            const cover = document.getElementById('player-cover');
+            cover.className = `w-16 h-16 rounded-2xl bg-gradient-to-br ${track.gradient} shadow-xl flex items-center justify-center shrink-0 transition-all duration-500`;
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+            const playSvg = '<path d="M8 5v14l11-7z"/>';
+
+            document.getElementById('main-play-icon').innerHTML = isPlaying ? pauseSvg : playSvg;
+            document.getElementById('di-play-icon').innerHTML = isPlaying ? pauseSvg : playSvg;
+
+            const waves = [document.getElementById('di-wave'), document.getElementById('di-exp-wave')];
+            waves.forEach(w => {
+                if (isPlaying) w.classList.remove('wave-paused');
+                else w.classList.add('wave-paused');
+            });
+        }
+
+        function nextTrack() {
+            trackIndex = (trackIndex + 1) % playlist.length;
+            trackElapsed = 0;
+            renderTrack();
+        }
+
+        function prevTrack() {
+            trackIndex = (trackIndex - 1 + playlist.length) % playlist.length;
+            trackElapsed = 0;
+            renderTrack();
+        }
+
+        function seekTrack(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            trackElapsed = Math.floor(ratio * playlist[trackIndex].duration);
+            updateProgressUI();
+        }
+
+        function updateProgressUI() {
+            const total = playlist[trackIndex].duration;
+            const pct = (trackElapsed / total) * 100;
+            const bar = document.getElementById('progress-bar');
+            const cur = document.getElementById('time-current');
+            if (bar) bar.style.width = `${pct}%`;
+            if (cur) cur.textContent = formatTime(trackElapsed);
+        }
+
+        setInterval(() => {
+            if (isPlaying) {
+                trackElapsed++;
+                if (trackElapsed >= playlist[trackIndex].duration) {
+                    nextTrack();
+                } else {
+                    updateProgressUI();
+                }
+            }
+        }, 1000);
+
+        /* -----------------------------------------------------------
+           6. CONNECTIVITY & FOCUS TOGGLES
+           ----------------------------------------------------------- */
+        const activeColorMap = {
+            wifi: ['bg-sky-500', 'shadow-sky-500/30'],
+            bt: ['bg-blue-600', 'shadow-blue-600/30'],
+            airdrop: ['bg-indigo-500', 'shadow-indigo-500/30'],
+            cellular: ['bg-emerald-500', 'shadow-emerald-500/30']
+        };
+
+        function toggleControl(btn, type) {
+            const isActive = btn.dataset.active === 'true';
+            const colors = activeColorMap[type];
+            const sub = btn.querySelector('.ctrl-sub');
+
+            if (isActive) {
+                btn.dataset.active = 'false';
+                btn.classList.remove(...colors, 'shadow-lg', 'text-white');
+                btn.classList.add('bg-white/10');
+                sub.textContent = 'Mati';
+            } else {
+                btn.dataset.active = 'true';
+                btn.classList.remove('bg-white/10');
+                btn.classList.add(...colors, 'shadow-lg', 'text-white');
+                const labels = { wifi: 'Apple_Spatial_6E', bt: 'AirPods Pro', airdrop: 'Semua Orang', cellular: 'Tersambung' };
+                sub.textContent = labels[type];
+            }
+
+            const count = document.querySelectorAll('.ctrl-btn[data-active="true"]').length;
+            document.getElementById('conn-status-badge').textContent = `${count} Aktif`;
+        }
+
+        let focusOn = false;
+        function toggleFocusMode() {
+            focusOn = !focusOn;
+            const btn = document.getElementById('focus-btn');
+            const iconWrap = document.getElementById('focus-icon-wrap');
+            const label = document.getElementById('focus-label');
+
+            if (focusOn) {
+                btn.style.background = 'rgba(168, 85, 247, 0.38)';
+                iconWrap.className = 'w-9 h-9 rounded-full bg-purple-500 text-white flex items-center justify-center shadow-lg';
+                label.innerHTML = 'Fokus<br><span class="text-purple-200 font-semibold">Kerja</span>';
+                showToast('Mode Fokus Kerja Diaktifkan');
+            } else {
+                btn.style.background = '';
+                iconWrap.className = 'w-9 h-9 rounded-full bg-purple-500/30 text-purple-300 flex items-center justify-center';
+                label.innerHTML = 'Fokus<br><span class="opacity-65 font-normal">Mati</span>';
+                showToast('Mode Fokus Dimatikan');
+            }
+        }
+
+        /* -----------------------------------------------------------
+           7. VERTICAL LIQUID SLIDERS (BRIGHTNESS & VOLUME)
+           ----------------------------------------------------------- */
+        function setupLiquidSlider(trackId, fillId, valId, onUpdate) {
+            const track = document.getElementById(trackId);
+            const fill = document.getElementById(fillId);
+            const label = document.getElementById(valId);
+            if (!track || !fill || !label) return;
+            let dragging = false;
+
+            function handleMove(clientY) {
+                const rect = track.getBoundingClientRect();
+                const ratio = 1 - Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+                const pct = Math.round(ratio * 100);
+                fill.style.height = `${pct}%`;
+                label.textContent = `${pct}%`;
+                if (onUpdate) onUpdate(pct);
+            }
+
+            track.addEventListener('pointerdown', (e) => {
+                dragging = true;
+                track.setPointerCapture(e.pointerId);
+                handleMove(e.clientY);
+            });
+
+            track.addEventListener('pointermove', (e) => {
+                if (dragging) handleMove(e.clientY);
+            });
+
+            track.addEventListener('pointerup', () => {
+                dragging = false;
+            });
+        }
+
+        // Brightness slider actually dims/brightens the viewport overlay
+        setupLiquidSlider('brightness-slider', 'brightness-fill', 'brightness-val', (pct) => {
+            const overlay = document.getElementById('brightness-overlay');
+            // Map 0% brightness -> max 0.68 dark overlay so screen never turns pitch black
+            const darkness = ((100 - pct) / 100) * 0.68;
+            overlay.style.opacity = darkness.toFixed(2);
+        });
+
+        setupLiquidSlider('volume-slider', 'volume-fill', 'volume-val');
+
+        /* -----------------------------------------------------------
+           8. SMART HOME THERMOSTAT & AMBIENT LIGHT
+           ----------------------------------------------------------- */
+        let currentTemp = 21.5;
+        function adjustTemp(delta) {
+            currentTemp = Math.max(16, Math.min(30, currentTemp + delta));
+            document.getElementById('thermostat-temp').textContent = `${currentTemp.toFixed(1)}°C`;
+        }
+
+        let ambientOn = true;
+        function toggleAmbientLight() {
+            ambientOn = !ambientOn;
+            const btn = document.getElementById('ambient-light-btn');
+            if (ambientOn) {
+                btn.textContent = 'Lampu: ON';
+                btn.className = 'px-3.5 py-1.5 rounded-full bg-amber-400 text-slate-950 text-xs font-bold shadow-lg shadow-amber-400/30 transition active:scale-95';
+                showToast('Pencahayaan Adaptif Ruangan Dinyalakan');
+            } else {
+                btn.textContent = 'Lampu: OFF';
+                btn.className = 'px-3.5 py-1.5 rounded-full bg-white/15 text-xs font-bold transition active:scale-95';
+                showToast('Pencahayaan Adaptif Ruangan Dimatikan');
+            }
+        }
+
+        /* -----------------------------------------------------------
+           9. GLASS CUSTOMIZER MODAL & TOAST SYSTEM
+           ----------------------------------------------------------- */
+        function openGlassModal() {
+            const modal = document.getElementById('glass-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeGlassModal() {
+            const modal = document.getElementById('glass-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function updateGlassVar(cssVar, value, labelId, labelText) {
+            document.documentElement.style.setProperty(cssVar, value);
+            document.getElementById(labelId).textContent = labelText;
+        }
+
+        function resetGlassDefaults() {
+            updateGlassVar('--glass-blur', '32px', 'lbl-blur', '32px');
+            updateGlassVar('--glass-opacity', '0.14', 'lbl-opacity', '14%');
+            updateGlassVar('--glass-border-alpha', '0.38', 'lbl-border', '38%');
+            updateGlassVar('--glass-saturation', '185%', 'lbl-sat', '185%');
+            showToast('Material Liquid Glass dikembalikan ke default');
+        }
+
+        let toastTimer;
+        function showToast(msg) {
+            const toast = document.getElementById('system-toast');
+            document.getElementById('toast-text').textContent = msg;
+            toast.classList.remove('opacity-0', '-translate-y-4');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-4');
+            }, 2600);
+        }
+
+        /* -----------------------------------------------------------
+           10. LIVE REAL-TIME CLOCK
+           ----------------------------------------------------------- */
+        function updateClocks() {
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+
+            const statusTime = document.getElementById('status-time');
+            const widgetClock = document.getElementById('widget-clock');
+            const liveDate = document.getElementById('live-date-full');
+
+            if (statusTime) statusTime.textContent = `${hh}:${mm}`;
+            if (widgetClock) widgetClock.textContent = `${hh}:${mm}:${ss}`;
+
+            if (liveDate) {
+                const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+                liveDate.textContent = now.toLocaleDateString('id-ID', options);
+            }
+        }
+
+        updateClocks();
+        setInterval(updateClocks, 1000);
+
+        /* -----------------------------------------------------------
+           11. FLUID AUTO-EXPANDING SPATIAL DOCK ENGINE
+           ----------------------------------------------------------- */
+        const spatialDock = document.getElementById('spatial-dock');
+        const BASE_ICON_SIZE = 48;
+        const MAX_ICON_SIZE = 68;
+        const INFLUENCE_RADIUS = 135;
+
+        function updateDockMagnification(mouseX) {
+            const slots = spatialDock.querySelectorAll('.dock-slot');
+            slots.forEach(slot => {
+                const rect = slot.getBoundingClientRect();
+                const slotCenterX = rect.left + rect.width / 2;
+                const distance = Math.abs(mouseX - slotCenterX);
+
+                if (distance < INFLUENCE_RADIUS) {
+                    // Smooth cosine wave curve like macOS / visionOS Dock
+                    const factor = Math.cos((distance / INFLUENCE_RADIUS) * (Math.PI / 2));
+                    const targetSize = Math.round(BASE_ICON_SIZE + (MAX_ICON_SIZE - BASE_ICON_SIZE) * factor);
+                    slot.style.width = `${targetSize}px`;
+                    slot.style.height = `${targetSize}px`;
+                } else {
+                    slot.style.width = `${BASE_ICON_SIZE}px`;
+                    slot.style.height = `${BASE_ICON_SIZE}px`;
+                }
+            });
+        }
+
+        function resetDockMagnification() {
+            spatialDock.querySelectorAll('.dock-slot').forEach(slot => {
+                slot.style.width = `${BASE_ICON_SIZE}px`;
+                slot.style.height = `${BASE_ICON_SIZE}px`;
+            });
+        }
+
+        spatialDock.addEventListener('mousemove', (e) => {
+            updateDockMagnification(e.clientX);
+        });
+
+        spatialDock.addEventListener('mouseleave', () => {
+            resetDockMagnification();
+        });
+
+        function setDockActive(appKey) {
+            spatialDock.querySelectorAll('.dock-slot').forEach(slot => {
+                const dot = slot.querySelector('.dock-dot');
+                if (!dot) return;
+                if (slot.dataset.app === appKey) {
+                    dot.classList.remove('opacity-0');
+                } else {
+                    dot.classList.add('opacity-0');
+                }
+            });
+        }
+
+        // Toggle adding/removing extra apps so the Dock bar dynamically stretches & shrinks
+        let extraAppsExpanded = false;
+        function toggleExtraDockApps() {
+            const list = document.getElementById('dock-apps-list');
+            const plusIcon = document.getElementById('dock-plus-icon');
+            const tooltip = document.getElementById('drawer-tooltip');
+            extraAppsExpanded = !extraAppsExpanded;
+
+            if (extraAppsExpanded) {
+                plusIcon.style.transform = 'rotate(45deg)';
+                tooltip.textContent = 'Sembunyikan Apl Ekstra';
+
+                const extraApps = [
+                    {
+                        key: 'notes',
+                        name: 'Catatan Spatial',
+                        bg: 'from-amber-400 to-orange-500',
+                        svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'
+                    },
+                    {
+                        key: 'camera',
+                        name: 'Kamera 3D',
+                        bg: 'from-emerald-400 to-teal-600',
+                        svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3"/>'
+                    }
+                ];
+
+                extraApps.forEach(app => {
+                    const slot = document.createElement('div');
+                    slot.className = 'dock-slot dock-slot-enter extra-dock-slot';
+                    slot.dataset.app = app.key;
+                    slot.innerHTML = `
+                        <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">${app.name}</span>
+                        <button onclick="openAppWindow('${app.key}'); setDockActive('${app.key}')" class="dock-item rounded-2xl bg-gradient-to-b ${app.bg} border border-white/35 shadow-lg">
+                            <svg class="w-[54%] h-[54%] text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${app.svg}</svg>
+                        </button>
+                        <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white opacity-0 absolute -bottom-1.5 transition-opacity"></span>
+                    `;
+                    list.appendChild(slot);
+                });
+
+                showToast('2 Aplikasi ditambahkan — Bar Dock melebar otomatis');
+            } else {
+                plusIcon.style.transform = 'rotate(0deg)';
+                tooltip.textContent = 'Tambah Apl ke Bar';
+                document.querySelectorAll('.extra-dock-slot').forEach(el => el.remove());
+                showToast('Bar Dock disesuaikan kembali');
+            }
+        }
+
+        // Interactive Floating App Window when clicking Dock Icons
+        function openAppWindow(appKey) {
+            const modal = document.getElementById('spatial-app-modal');
+            const title = document.getElementById('app-modal-title');
+            const sub = document.getElementById('app-modal-sub');
+            const body = document.getElementById('app-modal-body');
+            const badge = document.getElementById('app-modal-badge');
+
+            const appConfigs = {
+                safari: {
+                    title: 'Safari Spatial Browser',
+                    sub: 'apple.com/id/ios-27-preview',
+                    badgeClass: 'bg-sky-500',
+                    content: `
+                        <div class="glass-well rounded-2xl p-4 space-y-2">
+                            <div class="text-xs font-semibold text-sky-300 uppercase tracking-wider">Tab Kaca Melayang</div>
+                            <p>Selamat datang di pengalaman penjelajahan <strong>Liquid Glass</strong>. Seluruh bilah alamat dan tab menyatu secara transparan dengan latar belakang atmosfer Anda.</p>
+                        </div>
+                    `
+                },
+                notes: {
+                    title: 'Catatan Spatial',
+                    sub: 'Disinkronkan via iCloud+',
+                    badgeClass: 'bg-amber-500',
+                    content: `
+                        <textarea rows="4" class="w-full rounded-2xl bg-white/10 border border-white/20 p-3.5 text-sm focus:outline-none focus:border-white/50" placeholder="Tulis catatan cepat di atas lapisan kaca...">Ide Desain iOS 27:
+- Dock elastis yang membesar mengikuti kursor
+- Efek pembiasan tepi kaca adaptif</textarea>
+                    `
+                },
+                camera: {
+                    title: 'Kamera Spatial 3D',
+                    sub: 'Mode Foto Spasial • 4K 60fps',
+                    badgeClass: 'bg-emerald-500',
+                    content: `
+                        <div class="h-36 rounded-2xl bg-gradient-to-tr from-slate-900 via-emerald-950 to-teal-900 border border-white/20 flex flex-col items-center justify-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span class="text-xs font-medium opacity-80">Sensor Kedalaman LiDAR Aktif</span>
+                        </div>
+                    `
+                }
+            };
+
+            const cfg = appConfigs[appKey] || appConfigs.safari;
+            title.textContent = cfg.title;
+            sub.textContent = cfg.sub;
+            badge.className = `w-8 h-8 rounded-xl ${cfg.badgeClass} flex items-center justify-center text-white shadow`;
+            body.innerHTML = cfg.content;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeAppWindow() {
+            const modal = document.getElementById('spatial-app-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        /* -----------------------------------------------------------
+           12. SMOOTH SCROLL FROM "GHz" SPLASH TO MAIN iOS 27 UI
+           ----------------------------------------------------------- */
+        function scrollToMainOS() {
+            const mainOS = document.getElementById('main-os-wrapper');
+            if (mainOS) {
+                mainOS.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function handleSplashScrollState() {
+            const scrollY = window.scrollY;
+            const winH = window.innerHeight;
+            const dockNav = document.getElementById('bottom-dock-nav');
+            const ghzHero = document.getElementById('ghz-hero-screen');
+
+            // Parallax fade out on GHz splash while scrolling down
+            if (ghzHero) {
+                const progress = Math.min(1, scrollY / (winH * 0.75));
+                ghzHero.style.opacity = `${1 - progress}`;
+                ghzHero.style.transform = `translateY(${-scrollY * 0.25}px) scale(${1 - progress * 0.06})`;
+            }
+
+            // Reveal Floating Dock once user scrolls down into Main OS UI
+            if (dockNav) {
+                if (scrollY > winH * 0.45) {
+                    dockNav.classList.remove('opacity-0', 'translate-y-8', 'pointer-events-none');
+                } else {
+                    dockNav.classList.add('opacity-0', 'translate-y-8', 'pointer-events-none');
+                }
+            }
+        }
+
+        window.addEventListener('scroll', handleSplashScrollState, { passive: true });
+        handleSplashScrollState();
+    </script>
+</body>
+</html>

@@ -49,6 +49,10 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        input, textarea {
+            user-select: text;
+        }
+
         body {
             margin: 0;
             min-height: 100vh;
@@ -140,7 +144,6 @@
             backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
             -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
             border-radius: 30px;
-            /* Specular inner thickness & multi-layered spatial drop shadow */
             box-shadow: 
                 0 28px 56px -14px rgba(0, 0, 0, 0.42),
                 0 6px 18px -4px rgba(0, 0, 0, 0.22),
@@ -215,6 +218,12 @@
                 0 8px 20px -4px rgba(0, 0, 0, 0.25),
                 inset 0 1.5px 2px rgba(255, 255, 255, calc(var(--glass-border-alpha) + 0.3)),
                 inset 0 -1.5px 2.5px rgba(0, 0, 0, 0.22);
+        }
+
+        /* Drag-over highlight for Spatial Audio card */
+        #media-player-card.drag-active {
+            box-shadow: 0 0 0 2.5px rgba(56, 189, 248, 0.85), 0 30px 60px rgba(14, 165, 233, 0.35);
+            transform: scale(1.015);
         }
 
         /* =========================================================
@@ -437,9 +446,24 @@
         input[type="range"].apple-range::-webkit-slider-thumb:hover {
             transform: scale(1.15);
         }
+
+        /* Custom thin scrollbar for playlist */
+        .glass-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .glass-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .glass-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 999px;
+        }
     </style>
 </head>
 <body class="antialiased selection:bg-white/30">
+
+    <!-- Hidden Real HTML5 Audio Engine for Custom User Music -->
+    <audio id="spatial-audio-engine" preload="metadata"></audio>
 
     <!-- Real-time Screen Brightness Overlay -->
     <div id="brightness-overlay"></div>
@@ -455,7 +479,6 @@
          INITIAL FULL-SCREEN SPLASH: "GHz" LIQUID GLASS HERO
          ========================================================= -->
     <section id="ghz-hero-screen" class="relative min-h-screen w-full flex flex-col items-center justify-center px-6 text-center z-20 transition-all duration-700">
-        <!-- Ambient Chromatic Halo Behind GHz Card -->
         <div class="relative max-w-xl w-full flex items-center justify-center ghz-emblem-float">
             <div class="absolute -inset-4 rounded-[52px] bg-gradient-to-tr from-sky-400/25 via-fuchsia-400/20 to-emerald-400/25 blur-2xl pointer-events-none"></div>
 
@@ -510,7 +533,7 @@
             <!-- Collapsed State -->
             <div id="di-collapsed" class="w-full flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-400 via-blue-500 to-purple-500 shrink-0 shadow-inner"></div>
+                    <div id="di-mini-cover" class="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-400 via-blue-500 to-purple-500 shrink-0 shadow-inner bg-cover bg-center"></div>
                     <span id="di-mini-title" class="text-[11px] font-medium truncate text-white/90">Spatial Horizon</span>
                 </div>
                 <div id="di-wave" class="flex items-end gap-[2.5px] h-4 shrink-0">
@@ -525,8 +548,8 @@
             <div id="di-expanded" class="hidden w-full flex-col justify-between py-2.5 gap-2.5" onclick="event.stopPropagation()">
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3 min-w-0">
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
-                            <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <div id="di-exp-cover" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 flex items-center justify-center shadow-lg shrink-0 bg-cover bg-center overflow-hidden">
+                            <svg id="di-exp-cover-icon" class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
                         </div>
                         <div class="min-w-0">
                             <div id="di-exp-title" class="text-sm font-bold text-white truncate">Spatial Horizon</div>
@@ -590,7 +613,7 @@
                     iOS 27 • Liquid Glass Engine
                 </div>
                 <h1 id="widget-clock" class="text-4xl sm:text-5xl font-bold tracking-tight tabular-nums">22:45:00</h1>
-                <p id="live-date-full" class="text-xs sm:text-sm opacity-75 mt-1">Jumat, 13 November 2026</p>
+                <p id="live-date-full" class="text-xs sm:text-sm opacity-75 mt-1">Sabtu, 14 November 2026</p>
             </div>
 
             <!-- Atmosphere Swatches -->
@@ -662,27 +685,45 @@
                 </div>
             </div>
 
-            <!-- Spatial Media Player (4 cols) -->
-            <div class="md:col-span-4 liquid-glass tilt-card bento-reveal p-5 flex flex-col justify-between gap-4" style="transition-delay: 180ms;">
-                <div class="flex items-center justify-between">
+            <!-- Spatial Media Player — Customizable with User's Own Music (4 cols) -->
+            <div id="media-player-card" class="md:col-span-4 liquid-glass tilt-card bento-reveal p-5 flex flex-col justify-between gap-4 relative" style="transition-delay: 180ms;">
+                <div class="flex items-center justify-between gap-2">
                     <span class="text-xs font-bold uppercase tracking-wider opacity-75">Spatial Audio</span>
-                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold">Lossless</span>
+                    <div class="flex items-center gap-1.5">
+                        <span id="audio-mode-badge" class="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold">Lossless</span>
+                        <button onclick="openMusicStudioModal()" title="Tambah / Custom Lagu Sendiri" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/20 hover:bg-white/30 border border-white/30 text-[10px] font-bold transition active:scale-95 shadow-sm">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                            Custom
+                        </button>
+                    </div>
                 </div>
 
+                <!-- Cover Artwork (Clickable to quick-pick audio file) & Track Info -->
                 <div class="flex items-center gap-3.5">
-                    <div id="player-cover" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 shadow-xl flex items-center justify-center shrink-0 transition-all duration-500">
-                        <svg class="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-                    </div>
-                    <div class="min-w-0">
+                    <button onclick="triggerQuickAudioUpload()" title="Klik untuk pilih file lagu (.mp3/.wav) atau drag & drop ke kartu ini" id="player-cover" class="group relative w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 shadow-xl flex items-center justify-center shrink-0 transition-all duration-500 bg-cover bg-center overflow-hidden cursor-pointer">
+                        <svg id="player-cover-icon" class="w-7 h-7 text-white transition-transform duration-300 group-hover:scale-75" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <div class="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity text-[9px] font-bold text-white leading-tight px-1 text-center">
+                            <svg class="w-4 h-4 mb-0.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                            Pilih Lagu
+                        </div>
+                    </button>
+                    <div class="min-w-0 flex-1">
                         <h3 id="track-title" class="text-base font-bold truncate">Spatial Horizon</h3>
                         <p id="track-artist" class="text-xs opacity-70 truncate">Apple Design Lab</p>
+                        <button onclick="openMusicStudioModal()" class="mt-1 text-[10px] font-semibold text-sky-300 hover:text-sky-200 underline underline-offset-2 transition">
+                            Edit Info & Playlist
+                        </button>
                     </div>
                 </div>
 
-                <!-- Interactive Scrubber -->
+                <!-- Hidden Quick Audio File Input -->
+                <input type="file" id="quick-audio-input" accept="audio/*" class="hidden" onchange="handleQuickAudioFile(event)">
+
+                <!-- Interactive Scrubber (Clickable & Draggable) -->
                 <div class="space-y-1.5">
-                    <div onclick="seekTrack(event)" class="w-full h-2 rounded-full bg-white/15 overflow-hidden cursor-pointer">
-                        <div id="progress-bar" class="h-full bg-white rounded-full transition-all duration-300" style="width: 38%;"></div>
+                    <div id="scrubber-track" class="group relative w-full h-2.5 rounded-full bg-white/15 cursor-pointer flex items-center touch-none">
+                        <div id="progress-bar" class="h-full bg-white rounded-full transition-all duration-150 pointer-events-none" style="width: 38%;"></div>
+                        <div id="scrubber-thumb" class="w-3.5 h-3.5 rounded-full bg-white shadow-md -ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                     </div>
                     <div class="flex justify-between text-[10px] font-medium opacity-65 tabular-nums">
                         <span id="time-current">1:24</span>
@@ -692,13 +733,13 @@
 
                 <!-- Playback Controls -->
                 <div class="flex items-center justify-center gap-5 pt-1">
-                    <button onclick="prevTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90">
+                    <button onclick="prevTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90" title="Lagu Sebelumnya">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
                     </button>
-                    <button onclick="togglePlay()" class="w-12 h-12 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-lg hover:scale-105 transition active:scale-95">
+                    <button onclick="togglePlay()" class="w-12 h-12 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-lg hover:scale-105 transition active:scale-95" title="Putar / Jeda">
                         <svg id="main-play-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                     </button>
-                    <button onclick="nextTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90">
+                    <button onclick="nextTrack()" class="p-2.5 rounded-full hover:bg-white/15 transition active:scale-90" title="Lagu Berikutnya">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                     </button>
                 </div>
@@ -728,7 +769,7 @@
                 </div>
             </div>
 
-            <!-- Focus Pill & Smart Home Controls (12 cols row) -->
+            <!-- Focus Pill & Smart Home Controls (6 cols row) -->
             <div class="md:col-span-6 liquid-glass tilt-card bento-reveal p-5 flex items-center justify-between gap-4" style="transition-delay: 310ms;">
                 <button id="focus-btn" onclick="toggleFocusMode()" class="glass-well flex-1 p-3.5 rounded-2xl flex items-center gap-3 text-left transition">
                     <div id="focus-icon-wrap" class="w-9 h-9 rounded-full bg-purple-500/30 text-purple-300 flex items-center justify-center shrink-0">
@@ -778,7 +819,16 @@
                     <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white absolute -bottom-1.5 transition-opacity"></span>
                 </div>
 
-                <!-- App 2: Spatial Safari -->
+                <!-- App 2: Spatial Music Studio -->
+                <div class="dock-slot" data-app="music">
+                    <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Custom Musik</span>
+                    <button onclick="openMusicStudioModal(); setDockActive('music')" class="dock-item rounded-2xl bg-gradient-to-b from-rose-500 to-pink-600 border border-white/35 shadow-lg">
+                        <svg class="w-[54%] h-[54%] text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                    </button>
+                    <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white opacity-0 absolute -bottom-1.5 transition-opacity"></span>
+                </div>
+
+                <!-- App 3: Spatial Safari -->
                 <div class="dock-slot" data-app="safari">
                     <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Safari Spatial</span>
                     <button onclick="openAppWindow('safari'); setDockActive('safari')" class="dock-item rounded-2xl bg-gradient-to-b from-sky-400 to-blue-600 border border-white/35 shadow-lg">
@@ -787,7 +837,7 @@
                     <span class="dock-dot w-1.5 h-1.5 rounded-full bg-white opacity-0 absolute -bottom-1.5 transition-opacity"></span>
                 </div>
 
-                <!-- App 3: Spatial Photos -->
+                <!-- App 4: Spatial Photos -->
                 <div class="dock-slot" data-app="photos">
                     <span class="dock-tooltip px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[11px] font-medium text-white shadow-lg">Ganti Atmosfer</span>
                     <button onclick="cycleWallpaper(); setDockActive('photos')" class="dock-item rounded-2xl bg-white border border-white/50 shadow-lg">
@@ -821,10 +871,98 @@
     </nav>
 
     <!-- =========================================================
+         CUSTOM MUSIC STUDIO MODAL (UPLOAD AUDIO, COVER & PLAYLIST)
+         ========================================================= -->
+    <div id="music-studio-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/50 backdrop-blur-md">
+        <div class="liquid-glass w-full max-w-lg p-6 sm:p-7 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-white/15 shrink-0">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-sky-300">iOS 27 Spatial Audio Studio</span>
+                    <h2 class="text-xl font-bold">Custom Musik Sendiri</h2>
+                </div>
+                <button onclick="closeMusicStudioModal()" class="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="py-4 space-y-4 overflow-y-auto glass-scroll pr-1">
+                <!-- Audio File Picker Dropzone -->
+                <div>
+                    <label class="block text-xs font-semibold mb-1.5">1. Pilih File Musik (.mp3, .wav, .m4a, .ogg)</label>
+                    <label for="studio-audio-file" class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/10 hover:bg-white/15 border border-dashed border-white/35 cursor-pointer transition">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl bg-sky-500/30 text-sky-200 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div id="studio-file-name" class="text-xs font-bold truncate">Klik untuk pilih lagu dari perangkat</div>
+                                <div class="text-[11px] opacity-65">Mendukung pemutaran audio asli secara langsung</div>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1.5 rounded-full bg-white text-slate-900 text-[11px] font-bold shrink-0">Browse</span>
+                    </label>
+                    <input type="file" id="studio-audio-file" accept="audio/*" class="hidden" onchange="onStudioAudioSelected(event)">
+                </div>
+
+                <!-- Song Title & Artist Inputs -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1.5">Judul Lagu</label>
+                        <input type="text" id="studio-track-title" placeholder="Contoh: Malam di Jakarta" class="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/25 text-xs font-medium focus:outline-none focus:border-sky-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold mb-1.5">Nama Artis</label>
+                        <input type="text" id="studio-track-artist" placeholder="Contoh: Koleksi Pribadi" class="w-full px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/25 text-xs font-medium focus:outline-none focus:border-sky-400">
+                    </div>
+                </div>
+
+                <!-- Cover Theme OR Custom Cover Image -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-semibold">Sampul Album (Gradien atau Gambar Sendiri)</label>
+                        <label for="studio-cover-file" class="text-[11px] font-bold text-sky-300 hover:text-sky-200 cursor-pointer underline">
+                            + Unggah Gambar Sampul
+                        </label>
+                        <input type="file" id="studio-cover-file" accept="image/*" class="hidden" onchange="onStudioCoverSelected(event)">
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/10 border border-white/15">
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="selectStudioGradient('from-cyan-400 via-blue-600 to-purple-600', this)" class="studio-grad-btn w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 ring-2 ring-white transition"></button>
+                            <button type="button" onclick="selectStudioGradient('from-rose-500 via-pink-500 to-amber-500', this)" class="studio-grad-btn w-7 h-7 rounded-full bg-gradient-to-br from-rose-500 via-pink-500 to-amber-500 opacity-75 transition"></button>
+                            <button type="button" onclick="selectStudioGradient('from-emerald-400 via-teal-500 to-cyan-700', this)" class="studio-grad-btn w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-700 opacity-75 transition"></button>
+                            <button type="button" onclick="selectStudioGradient('from-violet-500 via-fuchsia-600 to-indigo-800', this)" class="studio-grad-btn w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-600 to-indigo-800 opacity-75 transition"></button>
+                        </div>
+                        <div id="studio-cover-preview" class="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-600 to-purple-600 bg-cover bg-center flex items-center justify-center border border-white/30 shadow shrink-0">
+                            <svg id="studio-cover-preview-icon" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Button to Add & Play Custom Song -->
+                <button type="button" onclick="saveAndPlayCustomTrack()" class="w-full py-2.5 rounded-2xl bg-white text-slate-950 text-xs font-bold shadow-lg hover:scale-[1.01] active:scale-95 transition">
+                    Simpan & Putar Lagu Custom Sekarang
+                </button>
+
+                <!-- Current Playlist Manager -->
+                <div class="pt-2 border-t border-white/15">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider opacity-75">Daftar Putar Aktif</span>
+                        <span id="playlist-count-badge" class="text-[11px] opacity-70">3 Lagu</span>
+                    </div>
+                    <div id="studio-playlist-items" class="space-y-1.5 max-h-36 overflow-y-auto glass-scroll pr-1">
+                        <!-- Rendered dynamically via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
          MINI SPATIAL APP WINDOW (SAFARI / NOTES / CAMERA)
          ========================================================= -->
     <div id="spatial-app-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-        <div class="liquid-glass w-full max-w-lg p-6 animate-[fadeIn_0.25s_ease-out]">
+        <div class="liquid-glass w-full max-w-lg p-6">
             <div class="flex items-center justify-between pb-4 border-b border-white/15">
                 <div class="flex items-center gap-2.5">
                     <div id="app-modal-badge" class="w-8 h-8 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow">
@@ -854,7 +992,7 @@
          GLASS CUSTOMIZER MODAL (REAL-TIME SHADER/CSS TUNER)
          ========================================================= -->
     <div id="glass-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/45 backdrop-blur-sm">
-        <div class="liquid-glass w-full max-w-md p-6 sm:p-7 animate-[fadeIn_0.25s_ease-out]">
+        <div class="liquid-glass w-full max-w-md p-6 sm:p-7">
             <div class="flex items-center justify-between mb-5">
                 <div>
                     <span class="text-[10px] font-bold uppercase tracking-widest text-sky-300">iOS 27 Material Engine</span>
@@ -925,7 +1063,7 @@
     </div>
 
     <!-- =========================================================
-         JAVASCRIPT ENGINE: INTERACTIVITY, PHYSICS & REALTIME CLOCK
+         JAVASCRIPT ENGINE: INTERACTIVITY, PHYSICS & CUSTOM AUDIO
          ========================================================= -->
     <script>
         /* -----------------------------------------------------------
@@ -939,12 +1077,11 @@
                 card.style.setProperty('--card-mouse-x', `${x}px`);
                 card.style.setProperty('--card-mouse-y', `${y}px`);
 
-                // Subtle Apple visionOS 3D spatial tilt on cards
                 if (card.classList.contains('tilt-card')) {
                     const centerX = rect.width / 2;
                     const centerY = rect.height / 2;
-                    const rotateX = ((y - centerY) / centerY) * -2.6;
-                    const rotateY = ((x - centerX) / centerX) * 2.6;
+                    const rotateX = ((y - centerY) / centerY) * -2.4;
+                    const rotateY = ((x - centerX) / centerX) * 2.4;
                     card.style.transform = `perspective(1100px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) translateY(-2px)`;
                 }
             });
@@ -1031,7 +1168,6 @@
             if (o2) o2.style.background = wp.orb2;
             if (o3) o3.style.background = wp.orb3;
 
-            // Update active ring indicator
             document.querySelectorAll('.wp-btn').forEach(btn => {
                 if (btn.dataset.wp === key) {
                     btn.classList.add('ring-2', 'ring-white', 'scale-110');
@@ -1042,7 +1178,6 @@
                 }
             });
 
-            // Auto-switch to Light Glass if Spatial Silver is chosen
             if (key === 'silver' && !document.documentElement.classList.contains('light-glass')) {
                 toggleGlassTheme(true);
             } else if (key !== 'silver' && document.documentElement.classList.contains('light-glass')) {
@@ -1056,7 +1191,6 @@
             showToast(`Atmosfer: ${wpKeys[nextIdx].toUpperCase()}`);
         }
 
-        // Initialize default wallpaper
         setWallpaper('aurora');
 
         /* -----------------------------------------------------------
@@ -1065,15 +1199,17 @@
         function toggleGlassTheme(forceLight) {
             const html = document.documentElement;
             const isLight = typeof forceLight === 'boolean' ? forceLight : !html.classList.contains('light-glass');
+            const sunIcon = document.getElementById('theme-icon-sun');
+            const moonIcon = document.getElementById('theme-icon-moon');
             
             if (isLight) {
                 html.classList.add('light-glass');
-                document.getElementById('theme-icon-sun').classList.remove('hidden');
-                document.getElementById('theme-icon-moon').classList.add('hidden');
+                if (sunIcon) sunIcon.classList.remove('hidden');
+                if (moonIcon) moonIcon.classList.add('hidden');
             } else {
                 html.classList.remove('light-glass');
-                document.getElementById('theme-icon-sun').classList.add('hidden');
-                document.getElementById('theme-icon-moon').classList.remove('hidden');
+                if (sunIcon) sunIcon.classList.add('hidden');
+                if (moonIcon) moonIcon.classList.remove('hidden');
             }
         }
 
@@ -1085,6 +1221,8 @@
             const di = document.getElementById('dynamic-island');
             const collapsed = document.getElementById('di-collapsed');
             const expanded = document.getElementById('di-expanded');
+            if (!di || !collapsed || !expanded) return;
+
             diExpanded = !diExpanded;
 
             if (diExpanded) {
@@ -1109,65 +1247,186 @@
         }
 
         /* -----------------------------------------------------------
-           5. INTERACTIVE MUSIC PLAYER & WAVEFORM SYNC
+           5. CUSTOMIZABLE SPATIAL MEDIA PLAYER & REAL HTML5 AUDIO
            ----------------------------------------------------------- */
+        const audioEngine = document.getElementById('spatial-audio-engine');
+        if (audioEngine) audioEngine.volume = 0.75;
+
         const playlist = [
             {
                 title: 'Spatial Horizon',
                 artist: 'Apple Design Lab',
                 duration: 222,
-                gradient: 'from-cyan-400 via-blue-600 to-purple-600'
+                gradient: 'from-cyan-400 via-blue-600 to-purple-600',
+                audioUrl: null,
+                coverImage: null,
+                isCustom: false
             },
             {
                 title: 'Liquid Refraction',
                 artist: 'Cupertino Symphony',
                 duration: 198,
-                gradient: 'from-amber-400 via-rose-500 to-indigo-600'
+                gradient: 'from-amber-400 via-rose-500 to-indigo-600',
+                audioUrl: null,
+                coverImage: null,
+                isCustom: false
             },
             {
                 title: 'Midnight Glass',
                 artist: 'visionOS Soundscapes',
                 duration: 245,
-                gradient: 'from-emerald-400 via-teal-500 to-cyan-700'
+                gradient: 'from-emerald-400 via-teal-500 to-cyan-700',
+                audioUrl: null,
+                coverImage: null,
+                isCustom: false
             }
         ];
 
         let trackIndex = 0;
         let isPlaying = true;
-        let trackElapsed = 84; // seconds
+        let trackElapsed = 49;
 
         function formatTime(sec) {
+            if (!isFinite(sec) || sec < 0) sec = 0;
             const m = Math.floor(sec / 60);
             const s = Math.floor(sec % 60);
             return `${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
-        function renderTrack() {
-            const track = playlist[trackIndex];
-            document.getElementById('track-title').textContent = track.title;
-            document.getElementById('track-artist').textContent = track.artist;
-            document.getElementById('di-mini-title').textContent = track.title;
-            document.getElementById('di-exp-title').textContent = track.title;
-            document.getElementById('di-exp-artist').textContent = track.artist;
-            document.getElementById('time-total').textContent = formatTime(track.duration);
-
-            const cover = document.getElementById('player-cover');
-            cover.className = `w-16 h-16 rounded-2xl bg-gradient-to-br ${track.gradient} shadow-xl flex items-center justify-center shrink-0 transition-all duration-500`;
-        }
-
-        function togglePlay() {
-            isPlaying = !isPlaying;
+        function syncPlayPauseIcons() {
             const pauseSvg = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
             const playSvg = '<path d="M8 5v14l11-7z"/>';
 
-            document.getElementById('main-play-icon').innerHTML = isPlaying ? pauseSvg : playSvg;
-            document.getElementById('di-play-icon').innerHTML = isPlaying ? pauseSvg : playSvg;
+            const mainIcon = document.getElementById('main-play-icon');
+            const diIcon = document.getElementById('di-play-icon');
+            if (mainIcon) mainIcon.innerHTML = isPlaying ? pauseSvg : playSvg;
+            if (diIcon) diIcon.innerHTML = isPlaying ? pauseSvg : playSvg;
 
             const waves = [document.getElementById('di-wave'), document.getElementById('di-exp-wave')];
             waves.forEach(w => {
+                if (!w) return;
                 if (isPlaying) w.classList.remove('wave-paused');
                 else w.classList.add('wave-paused');
             });
+        }
+
+        function renderTrack(autoPlayCustom = false) {
+            const track = playlist[trackIndex];
+            if (!track) return;
+
+            const titleEl = document.getElementById('track-title');
+            const artistEl = document.getElementById('track-artist');
+            const diMiniTitle = document.getElementById('di-mini-title');
+            const diExpTitle = document.getElementById('di-exp-title');
+            const diExpArtist = document.getElementById('di-exp-artist');
+            const timeTotalEl = document.getElementById('time-total');
+            const modeBadge = document.getElementById('audio-mode-badge');
+
+            if (titleEl) titleEl.textContent = track.title;
+            if (artistEl) artistEl.textContent = track.artist;
+            if (diMiniTitle) diMiniTitle.textContent = track.title;
+            if (diExpTitle) diExpTitle.textContent = track.title;
+            if (diExpArtist) diExpArtist.textContent = track.artist;
+            if (timeTotalEl) timeTotalEl.textContent = formatTime(track.duration);
+            if (modeBadge) {
+                modeBadge.textContent = track.isCustom ? 'Custom Audio' : 'Lossless';
+                modeBadge.className = track.isCustom
+                    ? 'px-2 py-0.5 rounded-full bg-sky-500/30 border border-sky-400/40 text-sky-200 text-[10px] font-bold'
+                    : 'px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-semibold';
+            }
+
+            // Cover artwork (custom image or liquid gradient)
+            const cover = document.getElementById('player-cover');
+            const coverIcon = document.getElementById('player-cover-icon');
+            const diMiniCover = document.getElementById('di-mini-cover');
+            const diExpCover = document.getElementById('di-exp-cover');
+            const diExpCoverIcon = document.getElementById('di-exp-cover-icon');
+
+            if (cover) {
+                cover.className = `group relative w-16 h-16 rounded-2xl bg-gradient-to-br ${track.gradient} shadow-xl flex items-center justify-center shrink-0 transition-all duration-500 bg-cover bg-center overflow-hidden cursor-pointer`;
+                cover.style.backgroundImage = track.coverImage ? `url('${track.coverImage}')` : '';
+            }
+            if (coverIcon) {
+                coverIcon.style.display = track.coverImage ? 'none' : 'block';
+            }
+            if (diMiniCover) {
+                diMiniCover.style.backgroundImage = track.coverImage ? `url('${track.coverImage}')` : '';
+            }
+            if (diExpCover) {
+                diExpCover.className = `w-12 h-12 rounded-2xl bg-gradient-to-br ${track.gradient} flex items-center justify-center shadow-lg shrink-0 bg-cover bg-center overflow-hidden`;
+                diExpCover.style.backgroundImage = track.coverImage ? `url('${track.coverImage}')` : '';
+            }
+            if (diExpCoverIcon) {
+                diExpCoverIcon.style.display = track.coverImage ? 'none' : 'block';
+            }
+
+            // Handle Real HTML5 Audio vs Simulated Demo Track
+            if (audioEngine) {
+                if (track.audioUrl) {
+                    if (audioEngine.src !== track.audioUrl) {
+                        audioEngine.src = track.audioUrl;
+                    }
+                    if (isPlaying || autoPlayCustom) {
+                        isPlaying = true;
+                        audioEngine.play().catch(() => {
+                            isPlaying = false;
+                            syncPlayPauseIcons();
+                        });
+                    } else {
+                        audioEngine.pause();
+                    }
+                } else {
+                    audioEngine.pause();
+                    audioEngine.removeAttribute('src');
+                }
+            }
+
+            syncPlayPauseIcons();
+            updateProgressUI();
+            renderPlaylistItems();
+        }
+
+        // Sync duration & real-time progress when playing user's own uploaded audio file
+        if (audioEngine) {
+            audioEngine.addEventListener('loadedmetadata', () => {
+                const track = playlist[trackIndex];
+                if (track && isFinite(audioEngine.duration)) {
+                    track.duration = Math.floor(audioEngine.duration);
+                    const timeTotalEl = document.getElementById('time-total');
+                    if (timeTotalEl) timeTotalEl.textContent = formatTime(track.duration);
+                    renderPlaylistItems();
+                }
+            });
+
+            audioEngine.addEventListener('timeupdate', () => {
+                const track = playlist[trackIndex];
+                if (track && track.audioUrl) {
+                    trackElapsed = audioEngine.currentTime;
+                    updateProgressUI();
+                }
+            });
+
+            audioEngine.addEventListener('ended', () => {
+                nextTrack();
+            });
+        }
+
+        function togglePlay() {
+            const track = playlist[trackIndex];
+            isPlaying = !isPlaying;
+
+            if (audioEngine && track && track.audioUrl) {
+                if (isPlaying) {
+                    audioEngine.play().catch(() => {
+                        isPlaying = false;
+                        syncPlayPauseIcons();
+                    });
+                } else {
+                    audioEngine.pause();
+                }
+            }
+
+            syncPlayPauseIcons();
         }
 
         function nextTrack() {
@@ -1182,32 +1441,268 @@
             renderTrack();
         }
 
-        function seekTrack(e) {
-            const rect = e.currentTarget.getBoundingClientRect();
-            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            trackElapsed = Math.floor(ratio * playlist[trackIndex].duration);
+        // Interactive Scrubber (Click + Drag)
+        const scrubberTrack = document.getElementById('scrubber-track');
+        let isScrubbing = false;
+
+        function scrubToClientX(clientX) {
+            if (!scrubberTrack) return;
+            const rect = scrubberTrack.getBoundingClientRect();
+            const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            const track = playlist[trackIndex];
+            if (!track) return;
+
+            if (audioEngine && track.audioUrl && isFinite(audioEngine.duration)) {
+                audioEngine.currentTime = ratio * audioEngine.duration;
+                trackElapsed = audioEngine.currentTime;
+            } else {
+                trackElapsed = Math.floor(ratio * track.duration);
+            }
             updateProgressUI();
         }
 
+        if (scrubberTrack) {
+            scrubberTrack.addEventListener('pointerdown', (e) => {
+                isScrubbing = true;
+                scrubberTrack.setPointerCapture(e.pointerId);
+                scrubToClientX(e.clientX);
+            });
+            scrubberTrack.addEventListener('pointermove', (e) => {
+                if (isScrubbing) scrubToClientX(e.clientX);
+            });
+            scrubberTrack.addEventListener('pointerup', () => {
+                isScrubbing = false;
+            });
+        }
+
         function updateProgressUI() {
-            const total = playlist[trackIndex].duration;
-            const pct = (trackElapsed / total) * 100;
+            const track = playlist[trackIndex];
+            if (!track) return;
+            const total = track.duration || 1;
+            const pct = Math.min(100, Math.max(0, (trackElapsed / total) * 100));
             const bar = document.getElementById('progress-bar');
             const cur = document.getElementById('time-current');
             if (bar) bar.style.width = `${pct}%`;
             if (cur) cur.textContent = formatTime(trackElapsed);
         }
 
+        // Simulated timer only for built-in demo tracks (real audio uses 'timeupdate')
         setInterval(() => {
-            if (isPlaying) {
+            const track = playlist[trackIndex];
+            if (isPlaying && track && !track.audioUrl && !isScrubbing) {
                 trackElapsed++;
-                if (trackElapsed >= playlist[trackIndex].duration) {
+                if (trackElapsed >= track.duration) {
                     nextTrack();
                 } else {
                     updateProgressUI();
                 }
             }
         }, 1000);
+
+        /* -----------------------------------------------------------
+           5B. QUICK AUDIO UPLOAD, DRAG & DROP & MUSIC STUDIO MODAL
+           ----------------------------------------------------------- */
+        function triggerQuickAudioUpload() {
+            const input = document.getElementById('quick-audio-input');
+            if (input) input.click();
+        }
+
+        function cleanFileNameToTitle(fileName) {
+            return fileName.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+        }
+
+        function addCustomAudioFileAndPlay(file, customTitle, customArtist, gradient, coverImage) {
+            if (!file) return;
+            const objectUrl = URL.createObjectURL(file);
+            const title = (customTitle && customTitle.trim()) ? customTitle.trim() : cleanFileNameToTitle(file.name);
+            const artist = (customArtist && customArtist.trim()) ? customArtist.trim() : 'Musik Kustom Saya';
+
+            playlist.unshift({
+                title,
+                artist,
+                duration: 180,
+                gradient: gradient || 'from-cyan-400 via-blue-600 to-purple-600',
+                audioUrl: objectUrl,
+                coverImage: coverImage || null,
+                isCustom: true
+            });
+
+            trackIndex = 0;
+            trackElapsed = 0;
+            isPlaying = true;
+            renderTrack(true);
+            showToast(`Memutar lagu kustom: ${title}`);
+        }
+
+        function handleQuickAudioFile(e) {
+            const file = e.target.files && e.target.files[0];
+            if (file) {
+                addCustomAudioFileAndPlay(file);
+            }
+            e.target.value = '';
+        }
+
+        // Drag & Drop audio files directly onto the Spatial Audio card
+        const mediaCard = document.getElementById('media-player-card');
+        if (mediaCard) {
+            mediaCard.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                mediaCard.classList.add('drag-active');
+            });
+            mediaCard.addEventListener('dragleave', () => {
+                mediaCard.classList.remove('drag-active');
+            });
+            mediaCard.addEventListener('drop', (e) => {
+                e.preventDefault();
+                mediaCard.classList.remove('drag-active');
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file && file.type.startsWith('audio/')) {
+                    addCustomAudioFileAndPlay(file);
+                } else {
+                    showToast('Silakan lepas file audio (.mp3, .wav, .m4a)');
+                }
+            });
+        }
+
+        // Music Studio Modal State & Controls
+        let studioSelectedAudioFile = null;
+        let studioSelectedCoverUrl = null;
+        let studioSelectedGradient = 'from-cyan-400 via-blue-600 to-purple-600';
+
+        function openMusicStudioModal() {
+            const modal = document.getElementById('music-studio-modal');
+            const currentTrack = playlist[trackIndex];
+            const titleInput = document.getElementById('studio-track-title');
+            const artistInput = document.getElementById('studio-track-artist');
+
+            if (titleInput && currentTrack) titleInput.value = currentTrack.title;
+            if (artistInput && currentTrack) artistInput.value = currentTrack.artist;
+
+            renderPlaylistItems();
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeMusicStudioModal() {
+            const modal = document.getElementById('music-studio-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function onStudioAudioSelected(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            studioSelectedAudioFile = file;
+            const nameEl = document.getElementById('studio-file-name');
+            const titleInput = document.getElementById('studio-track-title');
+            const artistInput = document.getElementById('studio-track-artist');
+
+            if (nameEl) nameEl.textContent = file.name;
+            if (titleInput) titleInput.value = cleanFileNameToTitle(file.name);
+            if (artistInput && (!artistInput.value || artistInput.value === 'Apple Design Lab')) {
+                artistInput.value = 'Koleksi Pribadi';
+            }
+        }
+
+        function onStudioCoverSelected(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            studioSelectedCoverUrl = URL.createObjectURL(file);
+            const preview = document.getElementById('studio-cover-preview');
+            const previewIcon = document.getElementById('studio-cover-preview-icon');
+            if (preview) preview.style.backgroundImage = `url('${studioSelectedCoverUrl}')`;
+            if (previewIcon) previewIcon.style.display = 'none';
+        }
+
+        function selectStudioGradient(gradClass, btnEl) {
+            studioSelectedGradient = gradClass;
+            studioSelectedCoverUrl = null;
+            const preview = document.getElementById('studio-cover-preview');
+            const previewIcon = document.getElementById('studio-cover-preview-icon');
+            if (preview) {
+                preview.style.backgroundImage = '';
+                preview.className = `w-11 h-11 rounded-xl bg-gradient-to-br ${gradClass} bg-cover bg-center flex items-center justify-center border border-white/30 shadow shrink-0`;
+            }
+            if (previewIcon) previewIcon.style.display = 'block';
+
+            document.querySelectorAll('.studio-grad-btn').forEach(b => {
+                b.classList.remove('ring-2', 'ring-white');
+                b.classList.add('opacity-75');
+            });
+            if (btnEl) {
+                btnEl.classList.add('ring-2', 'ring-white');
+                btnEl.classList.remove('opacity-75');
+            }
+        }
+
+        function saveAndPlayCustomTrack() {
+            const titleInput = document.getElementById('studio-track-title');
+            const artistInput = document.getElementById('studio-track-artist');
+            const newTitle = titleInput ? titleInput.value.trim() : '';
+            const newArtist = artistInput ? artistInput.value.trim() : '';
+
+            if (studioSelectedAudioFile) {
+                addCustomAudioFileAndPlay(
+                    studioSelectedAudioFile,
+                    newTitle,
+                    newArtist,
+                    studioSelectedGradient,
+                    studioSelectedCoverUrl
+                );
+                studioSelectedAudioFile = null;
+                const nameEl = document.getElementById('studio-file-name');
+                if (nameEl) nameEl.textContent = 'Klik untuk pilih lagu dari perangkat';
+            } else {
+                // Update metadata & cover of currently active track
+                const current = playlist[trackIndex];
+                if (current) {
+                    if (newTitle) current.title = newTitle;
+                    if (newArtist) current.artist = newArtist;
+                    current.gradient = studioSelectedGradient;
+                    if (studioSelectedCoverUrl) current.coverImage = studioSelectedCoverUrl;
+                    renderTrack();
+                    showToast(`Info lagu "${current.title}" diperbarui`);
+                }
+            }
+
+            closeMusicStudioModal();
+        }
+
+        function renderPlaylistItems() {
+            const container = document.getElementById('studio-playlist-items');
+            const countBadge = document.getElementById('playlist-count-badge');
+            if (countBadge) countBadge.textContent = `${playlist.length} Lagu`;
+            if (!container) return;
+
+            container.innerHTML = playlist.map((item, idx) => {
+                const active = idx === trackIndex;
+                return `
+                    <div onclick="selectTrackFromList(${idx})" class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl cursor-pointer transition ${active ? 'bg-white/25 border border-white/35' : 'bg-white/10 hover:bg-white/15'}">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br ${item.gradient} bg-cover bg-center shrink-0 flex items-center justify-center text-[10px] font-bold text-white" style="${item.coverImage ? `background-image:url('${item.coverImage}')` : ''}">
+                                ${item.coverImage ? '' : (active ? '▶' : idx + 1)}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold truncate">${item.title}</div>
+                                <div class="text-[10px] opacity-70 truncate">${item.artist} ${item.isCustom ? '• File Kustom' : ''}</div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-semibold opacity-70 tabular-nums shrink-0">${formatTime(item.duration)}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectTrackFromList(idx) {
+            trackIndex = idx;
+            trackElapsed = 0;
+            isPlaying = true;
+            renderTrack(true);
+        }
 
         /* -----------------------------------------------------------
            6. CONNECTIVITY & FOCUS TOGGLES
@@ -1228,17 +1723,18 @@
                 btn.dataset.active = 'false';
                 btn.classList.remove(...colors, 'shadow-lg', 'text-white');
                 btn.classList.add('bg-white/10');
-                sub.textContent = 'Mati';
+                if (sub) sub.textContent = 'Mati';
             } else {
                 btn.dataset.active = 'true';
                 btn.classList.remove('bg-white/10');
                 btn.classList.add(...colors, 'shadow-lg', 'text-white');
                 const labels = { wifi: 'Apple_Spatial_6E', bt: 'AirPods Pro', airdrop: 'Semua Orang', cellular: 'Tersambung' };
-                sub.textContent = labels[type];
+                if (sub) sub.textContent = labels[type];
             }
 
             const count = document.querySelectorAll('.ctrl-btn[data-active="true"]').length;
-            document.getElementById('conn-status-badge').textContent = `${count} Aktif`;
+            const badge = document.getElementById('conn-status-badge');
+            if (badge) badge.textContent = `${count} Aktif`;
         }
 
         let focusOn = false;
@@ -1247,6 +1743,7 @@
             const btn = document.getElementById('focus-btn');
             const iconWrap = document.getElementById('focus-icon-wrap');
             const label = document.getElementById('focus-label');
+            if (!btn || !iconWrap || !label) return;
 
             if (focusOn) {
                 btn.style.background = 'rgba(168, 85, 247, 0.38)';
@@ -1295,15 +1792,19 @@
             });
         }
 
-        // Brightness slider actually dims/brightens the viewport overlay
         setupLiquidSlider('brightness-slider', 'brightness-fill', 'brightness-val', (pct) => {
             const overlay = document.getElementById('brightness-overlay');
-            // Map 0% brightness -> max 0.68 dark overlay so screen never turns pitch black
-            const darkness = ((100 - pct) / 100) * 0.68;
-            overlay.style.opacity = darkness.toFixed(2);
+            if (overlay) {
+                const darkness = ((100 - pct) / 100) * 0.68;
+                overlay.style.opacity = darkness.toFixed(2);
+            }
         });
 
-        setupLiquidSlider('volume-slider', 'volume-fill', 'volume-val');
+        setupLiquidSlider('volume-slider', 'volume-fill', 'volume-val', (pct) => {
+            if (audioEngine) {
+                audioEngine.volume = pct / 100;
+            }
+        });
 
         /* -----------------------------------------------------------
            8. SMART HOME THERMOSTAT & AMBIENT LIGHT
@@ -1311,13 +1812,15 @@
         let currentTemp = 21.5;
         function adjustTemp(delta) {
             currentTemp = Math.max(16, Math.min(30, currentTemp + delta));
-            document.getElementById('thermostat-temp').textContent = `${currentTemp.toFixed(1)}°C`;
+            const el = document.getElementById('thermostat-temp');
+            if (el) el.textContent = `${currentTemp.toFixed(1)}°C`;
         }
 
         let ambientOn = true;
         function toggleAmbientLight() {
             ambientOn = !ambientOn;
             const btn = document.getElementById('ambient-light-btn');
+            if (!btn) return;
             if (ambientOn) {
                 btn.textContent = 'Lampu: ON';
                 btn.className = 'px-3.5 py-1.5 rounded-full bg-amber-400 text-slate-950 text-xs font-bold shadow-lg shadow-amber-400/30 transition active:scale-95';
@@ -1334,19 +1837,24 @@
            ----------------------------------------------------------- */
         function openGlassModal() {
             const modal = document.getElementById('glass-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
         }
 
         function closeGlassModal() {
             const modal = document.getElementById('glass-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
         }
 
         function updateGlassVar(cssVar, value, labelId, labelText) {
             document.documentElement.style.setProperty(cssVar, value);
-            document.getElementById(labelId).textContent = labelText;
+            const lbl = document.getElementById(labelId);
+            if (lbl) lbl.textContent = labelText;
         }
 
         function resetGlassDefaults() {
@@ -1360,7 +1868,9 @@
         let toastTimer;
         function showToast(msg) {
             const toast = document.getElementById('system-toast');
-            document.getElementById('toast-text').textContent = msg;
+            const textEl = document.getElementById('toast-text');
+            if (!toast || !textEl) return;
+            textEl.textContent = msg;
             toast.classList.remove('opacity-0', '-translate-y-4');
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => {
@@ -1402,6 +1912,7 @@
         const INFLUENCE_RADIUS = 135;
 
         function updateDockMagnification(mouseX) {
+            if (!spatialDock) return;
             const slots = spatialDock.querySelectorAll('.dock-slot');
             slots.forEach(slot => {
                 const rect = slot.getBoundingClientRect();
@@ -1409,7 +1920,6 @@
                 const distance = Math.abs(mouseX - slotCenterX);
 
                 if (distance < INFLUENCE_RADIUS) {
-                    // Smooth cosine wave curve like macOS / visionOS Dock
                     const factor = Math.cos((distance / INFLUENCE_RADIUS) * (Math.PI / 2));
                     const targetSize = Math.round(BASE_ICON_SIZE + (MAX_ICON_SIZE - BASE_ICON_SIZE) * factor);
                     slot.style.width = `${targetSize}px`;
@@ -1422,21 +1932,24 @@
         }
 
         function resetDockMagnification() {
+            if (!spatialDock) return;
             spatialDock.querySelectorAll('.dock-slot').forEach(slot => {
                 slot.style.width = `${BASE_ICON_SIZE}px`;
                 slot.style.height = `${BASE_ICON_SIZE}px`;
             });
         }
 
-        spatialDock.addEventListener('mousemove', (e) => {
-            updateDockMagnification(e.clientX);
-        });
-
-        spatialDock.addEventListener('mouseleave', () => {
-            resetDockMagnification();
-        });
+        if (spatialDock) {
+            spatialDock.addEventListener('mousemove', (e) => {
+                updateDockMagnification(e.clientX);
+            });
+            spatialDock.addEventListener('mouseleave', () => {
+                resetDockMagnification();
+            });
+        }
 
         function setDockActive(appKey) {
+            if (!spatialDock) return;
             spatialDock.querySelectorAll('.dock-slot').forEach(slot => {
                 const dot = slot.querySelector('.dock-dot');
                 if (!dot) return;
@@ -1448,12 +1961,13 @@
             });
         }
 
-        // Toggle adding/removing extra apps so the Dock bar dynamically stretches & shrinks
         let extraAppsExpanded = false;
         function toggleExtraDockApps() {
             const list = document.getElementById('dock-apps-list');
             const plusIcon = document.getElementById('dock-plus-icon');
             const tooltip = document.getElementById('drawer-tooltip');
+            if (!list || !plusIcon || !tooltip) return;
+
             extraAppsExpanded = !extraAppsExpanded;
 
             if (extraAppsExpanded) {
@@ -1498,13 +2012,13 @@
             }
         }
 
-        // Interactive Floating App Window when clicking Dock Icons
         function openAppWindow(appKey) {
             const modal = document.getElementById('spatial-app-modal');
             const title = document.getElementById('app-modal-title');
             const sub = document.getElementById('app-modal-sub');
             const body = document.getElementById('app-modal-body');
             const badge = document.getElementById('app-modal-badge');
+            if (!modal || !title || !sub || !body || !badge) return;
 
             const appConfigs = {
                 safari: {
@@ -1525,7 +2039,7 @@
                     content: `
                         <textarea rows="4" class="w-full rounded-2xl bg-white/10 border border-white/20 p-3.5 text-sm focus:outline-none focus:border-white/50" placeholder="Tulis catatan cepat di atas lapisan kaca...">Ide Desain iOS 27:
 - Dock elastis yang membesar mengikuti kursor
-- Efek pembiasan tepi kaca adaptif</textarea>
+- Pemutar Spatial Audio kustom dengan file musik sendiri</textarea>
                     `
                 },
                 camera: {
@@ -1553,8 +2067,10 @@
 
         function closeAppWindow() {
             const modal = document.getElementById('spatial-app-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
         }
 
         /* -----------------------------------------------------------
@@ -1573,14 +2089,12 @@
             const dockNav = document.getElementById('bottom-dock-nav');
             const ghzHero = document.getElementById('ghz-hero-screen');
 
-            // Parallax fade out on GHz splash while scrolling down
             if (ghzHero) {
                 const progress = Math.min(1, scrollY / (winH * 0.75));
                 ghzHero.style.opacity = `${1 - progress}`;
                 ghzHero.style.transform = `translateY(${-scrollY * 0.25}px) scale(${1 - progress * 0.06})`;
             }
 
-            // Reveal Floating Dock once user scrolls down into Main OS UI
             if (dockNav) {
                 if (scrollY > winH * 0.45) {
                     dockNav.classList.remove('opacity-0', 'translate-y-8', 'pointer-events-none');
@@ -1592,6 +2106,7 @@
 
         window.addEventListener('scroll', handleSplashScrollState, { passive: true });
         handleSplashScrollState();
+        renderTrack();
     </script>
 </body>
 </html>
